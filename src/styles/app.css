@@ -322,6 +322,9 @@
   gap: 16px;
 }
 
+/* The day panel scrolls; its contents must keep their natural height. */
+.day-panel-body > * { flex-shrink: 0; }
+
 .notes-editor {
   width: 100%;
   min-height: 72px;
@@ -339,6 +342,7 @@
 .ink-editor-inline {
   display: flex;
   flex-direction: column;
+  flex: 0 0 auto;
   background: var(--color-bg);
   color: var(--color-text);
   border-radius: var(--radius-md);
@@ -375,7 +379,7 @@
 .ink-options { justify-content: space-between; font-size: 12px; color: var(--color-text-secondary); }
 .ink-options label { display: flex; align-items: center; gap: 6px; min-height: 44px; color: var(--color-text); }
 .ink-options input { width: 20px; height: 20px; }
-.ink-scroll { height: 320px; overflow: auto; padding: 8px; background: var(--color-bg-sunken); }
+.ink-scroll { flex: 0 0 320px; height: 320px; overflow: auto; padding: 8px; background: var(--color-bg-sunken); }
 .ink-canvas {
   display: block;
   width: min(100%, 860px);
@@ -391,7 +395,7 @@
 .ink-footer span { font-size: 13px; font-weight: 600; min-width: 86px; text-align: center; }
 @media (max-width: 680px) {
   .ink-tools, .ink-options, .ink-footer { padding: 6px 8px; }
-  .ink-scroll { height: 260px; }
+  .ink-scroll { flex-basis: 260px; height: 260px; }
   .ink-tool { padding: 6px 9px; }
 }
 

@@ -25,7 +25,7 @@ export default function InkEditor({ dateISO }: Props) {
   const redoRef = useRef<InkDocument[]>([])
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const scrollTouchRef = useRef<{ id: number; y: number; top: number } | null>(null)
+  const scrollTouchRef = useRef<{ id: number; y: number; top: number; outerTop: number } | null>(null)
   const activeRef = useRef<InkStroke | null>(null)
   const activePointerRef = useRef<number | null>(null)
   const gestureBeforeRef = useRef<InkDocument | null>(null)
@@ -162,7 +162,12 @@ export default function InkEditor({ dateISO }: Props) {
   function onPointerDown(event: PointerEvent) {
     if (!documentRef.current || activePointerRef.current !== null) return
     if (event.pointerType === 'touch' && !fingerDraw) {
-      scrollTouchRef.current = { id: event.pointerId, y: event.clientY, top: scrollRef.current?.scrollTop ?? 0 }
+      scrollTouchRef.current = {
+        id: event.pointerId,
+        y: event.clientY,
+        top: scrollRef.current?.scrollTop ?? 0,
+        outerTop: scrollRef.current?.closest('.day-panel-body')?.scrollTop ?? 0
+      }
       canvasRef.current?.setPointerCapture(event.pointerId)
       return
     }
@@ -186,7 +191,14 @@ export default function InkEditor({ dateISO }: Props) {
   function onPointerMove(event: PointerEvent) {
     if (scrollTouchRef.current?.id === event.pointerId) {
       event.preventDefault()
-      if (scrollRef.current) scrollRef.current.scrollTop = scrollTouchRef.current.top + scrollTouchRef.current.y - event.clientY
+      const scroller = scrollRef.current
+      if (scroller) {
+        const desired = scrollTouchRef.current.top + scrollTouchRef.current.y - event.clientY
+        const clamped = Math.max(0, Math.min(scroller.scrollHeight - scroller.clientHeight, desired))
+        scroller.scrollTop = clamped
+        const outer = scroller.closest('.day-panel-body')
+        if (outer) outer.scrollTop = scrollTouchRef.current.outerTop + desired - clamped
+      }
       return
     }
     if (activePointerRef.current !== event.pointerId) return
@@ -250,9 +262,6 @@ export default function InkEditor({ dateISO }: Props) {
 
   return (
     <div class="ink-editor ink-editor-inline" role="region" aria-label={`Handwriting for ${dateISO}`} onKeyDown={handleKeyDown}>
-      <div class="ink-scroll scroll-panel" ref={scrollRef}>
-        {document ? <canvas ref={canvasRef} class="ink-canvas" role="img" aria-label={`Handwritten page ${pageIndex + 1} of ${document.pages.length}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishPointer} onPointerCancel={finishPointer} /> : <p>{status}</p>}
-      </div>
       <div class="ink-tools" role="toolbar" aria-label="Drawing tools">
         <button class={`ink-tool ${tool === 'pen' ? 'is-active' : ''}`} aria-pressed={tool === 'pen'} onClick={() => { setTool('pen'); toolRef.current = 'pen' }}>Pen</button>
         <button class={`ink-tool ${tool === 'eraser' ? 'is-active' : ''}`} aria-pressed={tool === 'eraser'} onClick={() => { setTool('eraser'); toolRef.current = 'eraser' }}>Eraser</button>
@@ -266,6 +275,9 @@ export default function InkEditor({ dateISO }: Props) {
       <div class="ink-options">
         <label><input type="checkbox" checked={fingerDraw} onChange={event => setFingerDraw((event.target as HTMLInputElement).checked)} /> Draw with finger</label>
         <span class="ink-save-status" role="status">{status}</span>
+      </div>
+      <div class="ink-scroll scroll-panel" ref={scrollRef}>
+        {document ? <canvas ref={canvasRef} class="ink-canvas" role="img" aria-label={`Handwritten page ${pageIndex + 1} of ${document.pages.length}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishPointer} onPointerCancel={finishPointer} /> : <p>{status}</p>}
       </div>
       <footer class="ink-footer">
         <button class="chip-btn" disabled={pageIndex === 0} onClick={() => setCurrentPage(pageIndex - 1)}>‹ Page</button>
