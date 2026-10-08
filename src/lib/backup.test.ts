@@ -16,6 +16,11 @@ describe('validateExportBundle', () => {
     expect(validateExportBundle(validBundle)).not.toBeNull()
     expect(validateExportBundle({ ...validBundle, version: 2, settings: [{ key: 'theme', value: 'dark' }] })).not.toBeNull()
     expect(validateExportBundle({ ...validBundle, version: 3, settings: [], ink: [{ date: '2026-01-01', updatedAt: 1, pages: [{ id: 'p', strokes: [{ id: 's', color: '#182331', size: 5, points: [{ x: 1, y: 2, pressure: 0.5 }] }] }] }] })).not.toBeNull()
+    expect(validateExportBundle({ ...validBundle, version: 4, settings: [], ink: [], revisionTopics: [], skills: [], milestones: [] })).not.toBeNull()
+  })
+
+  it('rejects incomplete v4 backups', () => {
+    expect(validateExportBundle({ ...validBundle, version: 4, settings: [], ink: [], revisionTopics: [], skills: [] })).toBeNull()
   })
 
   it('rejects null and non-object values', () => {

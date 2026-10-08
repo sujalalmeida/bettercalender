@@ -15,7 +15,7 @@ import { useIsTablet } from './lib/useMediaQuery'
 import { useLazyComponent } from './lib/useLazyComponent'
 import { useObservable } from './lib/useObservable'
 
-type View = 'month' | 'week'
+type View = 'month' | 'week' | 'revision' | 'skills' | 'milestones'
 
 function isIOS(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window)
@@ -110,6 +110,7 @@ export function App({ initialStorageNotice }: { initialStorageNotice: string | n
 
   const SearchOverlay = useLazyComponent(() => import('./components/SearchOverlay'), showSearch)
   const SettingsScreen = useLazyComponent(() => import('./components/SettingsScreen'), showSettings)
+  const LearningScreen = useLazyComponent(() => import('./components/LearningScreen'), view === 'revision' || view === 'skills' || view === 'milestones')
 
   return (
     <div class="app-shell">
@@ -117,22 +118,23 @@ export function App({ initialStorageNotice }: { initialStorageNotice: string | n
         <button class="icon-btn" aria-label="Search" onClick={() => setShowSearch(true)}>
           ⌕
         </button>
-        <div class="segmented-control" role="tablist">
-          <button role="tab" aria-selected={view === 'month'} class={view === 'month' ? 'is-active' : ''} onClick={() => setView('month')}>
-            Month
-          </button>
-          <button role="tab" aria-selected={view === 'week'} class={view === 'week' ? 'is-active' : ''} onClick={() => setView('week')}>
-            Week
-          </button>
+        <div class="topbar-tabs" role="tablist" aria-label="App sections">
+          <div class="segmented-control">
+            <button role="tab" aria-selected={view === 'month'} class={view === 'month' ? 'is-active' : ''} onClick={() => setView('month')}>Month</button>
+            <button role="tab" aria-selected={view === 'week'} class={view === 'week' ? 'is-active' : ''} onClick={() => setView('week')}>Week</button>
+          </div>
+          <div class="segmented-control learning-tabs">
+            {(['revision','skills','milestones'] as const).map(section => <button role="tab" aria-selected={view === section} class={view === section ? 'is-active' : ''} onClick={() => { setExpandedDate(null); setView(section) }}>{section[0].toUpperCase()+section.slice(1)}</button>)}
+          </div>
         </div>
         <button class="icon-btn" aria-label="Settings" onClick={() => setShowSettings(true)}>
           ⚙
         </button>
       </div>
 
-      <DueSoonStrip onJumpToDate={jumpToDate} />
+      {(view === 'month' || view === 'week') && <DueSoonStrip onJumpToDate={jumpToDate} />}
       {storageNotice && <div class="storage-notice" role="alert"><span>{storageNotice}</span><button class="chip-btn" onClick={() => setStorageNotice(null)}>OK</button></div>}
-      <RolloverBanner onReview={jumpToDate} />
+      {(view === 'month' || view === 'week') && <RolloverBanner onReview={jumpToDate} />}
 
       <div class="app-view">
         {view === 'month' ? (
@@ -145,7 +147,7 @@ export function App({ initialStorageNotice }: { initialStorageNotice: string | n
             onCollapse={handleCollapse}
             onNavigateDay={handleNavigateDay}
           />
-        ) : (
+        ) : view === 'week' ? (
           <WeekView
             anchorDate={weekAnchor}
             onAnchorChange={setWeekAnchor}
@@ -155,7 +157,7 @@ export function App({ initialStorageNotice }: { initialStorageNotice: string | n
             onCollapse={handleCollapse}
             onNavigateDay={handleNavigateDay}
           />
-        )}
+        ) : LearningScreen ? <LearningScreen kind={view} /> : null}
       </div>
 
       {!isTablet && expandedDate && (

@@ -73,7 +73,7 @@ The app shows this same guidance itself the first time it's opened in mobile Saf
 
 ## Back up your data
 
-Settings → **Export JSON** downloads everything (typed notes, handwritten pages, tasks, recurrences, categories, templates, settings) as one file. **Import JSON** restores it, with a choice to merge into or replace existing data. Offline data remains in this browser's IndexedDB. After cloud sync is configured and she signs in, Firebase provides a second copy and cross-device access. Older version 1 and 2 backups still import.
+Settings → **Export JSON** downloads everything (typed notes, handwritten pages, tasks, recurrences, categories, templates, settings) as one file. **Import JSON** restores it, with a choice to merge into or replace existing data. Offline data remains in this browser's IndexedDB. After cloud sync is configured and she signs in, Firebase provides a second copy and cross-device access. Older version 1, 2 and 3 backups still import.
 
 ## Apple Pencil on iPad
 
@@ -115,3 +115,19 @@ The first successful launch creates an installation marker. If browser storage i
 - [ ] Toggle the device between light and dark mode (and the in-app Settings override) — contrast stays good everywhere.
 - [ ] Rotate an iPad between portrait/landscape mid-use — layout reflows, nothing clips.
 - [ ] After a new deployment, reopening the app shows the "Update available — tap to refresh" toast instead of silently reloading.
+
+## Revision, skills and milestones
+
+The top tabs open separate Revision, Skills and Milestones workspaces. Each can be filled in manually. Revision keeps weak topics, confidence, and a next review date; after a review, confidence 1/2/3 schedules another look in 1/3/7 days. Skills stores brief learning or practice notes with a next step and status. Milestones stores exams, applications, electives, references and forms with optional deadlines and checklists. Avoid patient-identifying details in all notes. These records are saved offline first, included in version 4 JSON backups, and synced through Firestore when cloud sync is connected.
+
+### Optional Gemini suggestions
+
+Gemini can extract suggested fields from a typed or dictated note, an image/PDF schedule or syllabus, or an audio recording. Every suggestion appears in an editable review card and saves only when tapped. Audio and uploaded files are sent to Gemini on Analyze; they are not stored in the app. Keep patient details and sensitive personal notes out of AI input.
+
+This uses **Firebase AI Logic**, so the separate Gemini API key is not placed in the client app or needed for this integration. To activate it:
+
+1. In the Firebase console, set up Firebase AI Logic with the Gemini Developer API for this project.
+2. Register the web app with App Check using reCAPTCHA Enterprise and add its site key to `.env.local` as `VITE_FIREBASE_APPCHECK_SITE_KEY`. Enable enforcement for Firebase AI Logic in the console after verifying requests. Keep the site key restricted to your deployed domain; add a development domain or debug token for local testing.
+3. Restart the Vite server or redeploy after changing `.env.local`. Optionally set `VITE_GEMINI_MODEL` to a model enabled for your project. The default is `gemini-2.5-flash`.
+
+Manual entry works without Gemini. Firestore cloud sync requires Firebase Authentication Email/Password to be enabled separately; the Firebase web config in `.env.local` alone does not activate sign-in or sync. In Settings → Cloud sync, a successful account sign-in and “Saved on this device and synced to Firebase” confirms cloud sync. Gemini suggestions do not require a signed-in account, but App Check must be configured. Avoid the Gemini Developer API free tier for sensitive content because its data-use terms differ from paid usage.

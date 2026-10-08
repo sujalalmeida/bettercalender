@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { Category, Day, InkDocument, Recurrence, SettingsRow, Task, Template } from './types'
+import type { Category, Day, InkDocument, Milestone, Recurrence, RevisionTopic, SettingsRow, SkillEntry, Task, Template } from './types'
 
 export interface SyncChange { key: string; collection: string; id: string; revision: string }
 
@@ -12,6 +12,9 @@ export class PlanDatabase extends Dexie {
   templates!: Table<Template, string>
   settings!: Table<SettingsRow, string>
   syncChanges!: Table<SyncChange, string>
+  revisionTopics!: Table<RevisionTopic, string>
+  skills!: Table<SkillEntry, string>
+  milestones!: Table<Milestone, string>
 
   constructor() {
     super('plan-db')
@@ -31,6 +34,13 @@ export class PlanDatabase extends Dexie {
 
     // Pending cloud writes survive reloads and offline periods.
     this.version(3).stores({ syncChanges: '&key' })
+
+    // Separate learning and milestone sections; existing calendar rows are untouched.
+    this.version(4).stores({
+      revisionTopics: '&id, nextReviewDate, subject, mastered, updatedAt',
+      skills: '&id, kind, status, rotation, updatedAt',
+      milestones: '&id, dueDate, status, kind, updatedAt'
+    })
 
     // Example migration for future changes (bumping version adds an index
     // without touching existing rows, so her data is preserved):

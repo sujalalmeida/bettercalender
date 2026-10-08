@@ -65,3 +65,50 @@ export interface SettingsRow {
   key: string
   value: unknown
 }
+
+export interface RevisionTopic {
+  id: string
+  title: string
+  subject: string
+  reason: string
+  takeaway: string
+  source: string
+  confidence: 1 | 2 | 3
+  nextReviewDate: string
+  reviewCount: number
+  mastered: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+export interface SkillEntry {
+  id: string
+  kind: 'learning' | 'practice'
+  title: string
+  note: string
+  rotation: string
+  nextStep: string
+  confidence: 1 | 2 | 3
+  status: 'active' | 'done' | 'cancelled'
+  createdAt: number
+  updatedAt: number
+}
+
+export interface MilestoneStep {
+  id: string
+  title: string
+  done: boolean
+}
+
+export interface Milestone {
+  id: string
+  kind: 'exam' | 'application' | 'elective' | 'reference' | 'form' | 'other'
+  title: string
+  dueDate: string
+  notes: string
+  url: string
+  steps: MilestoneStep[]
+  status: 'planned' | 'waiting' | 'done' | 'cancelled'
+  createdAt: number
+  updatedAt: number
+}

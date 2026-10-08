@@ -65,6 +65,16 @@ function isInkDocument(v: unknown): boolean {
   )
 }
 
+function isRevision(v: unknown): boolean {
+  return isObject(v) && isString(v.id) && isString(v.title) && isString(v.subject) && isString(v.reason) && isString(v.takeaway) && isString(v.source) && [1,2,3].includes(v.confidence as number) && isDate(v.nextReviewDate) && isNumber(v.reviewCount) && isBoolean(v.mastered) && isNumber(v.createdAt) && isNumber(v.updatedAt)
+}
+function isSkill(v: unknown): boolean {
+  return isObject(v) && isString(v.id) && ['learning','practice'].includes(String(v.kind)) && isString(v.title) && isString(v.note) && isString(v.rotation) && isString(v.nextStep) && [1,2,3].includes(v.confidence as number) && ['active','done','cancelled'].includes(String(v.status)) && isNumber(v.createdAt) && isNumber(v.updatedAt)
+}
+function isMilestone(v: unknown): boolean {
+  return isObject(v) && isString(v.id) && ['exam','application','elective','reference','form','other'].includes(String(v.kind)) && isString(v.title) && (v.dueDate === '' || isDate(v.dueDate)) && isString(v.notes) && isString(v.url) && isArray(v.steps) && v.steps.every(s => isObject(s) && isString(s.id) && isString(s.title) && isBoolean(s.done)) && ['planned','waiting','done','cancelled'].includes(String(v.status)) && isNumber(v.createdAt) && isNumber(v.updatedAt)
+}
+
 /**
  * Validates an untrusted parsed-JSON value against the export schema.
  * Returns the bundle if valid, or null if the shape doesn't match
@@ -73,7 +83,7 @@ function isInkDocument(v: unknown): boolean {
  */
 export function validateExportBundle(value: unknown): ExportBundle | null {
   if (!isObject(value)) return null
-  if (value.version !== 1 && value.version !== 2 && value.version !== 3) return null
+  if (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== 4) return null
   if (!isString(value.exportedAt) || Number.isNaN(Date.parse(value.exportedAt))) return null
   if (!isArray(value.days) || !value.days.every(isDay)) return null
   if (!isArray(value.tasks) || !value.tasks.every(isTask)) return null
@@ -81,7 +91,9 @@ export function validateExportBundle(value: unknown): ExportBundle | null {
   if (!isArray(value.categories) || !value.categories.every(isCategory)) return null
   if (!isArray(value.templates) || !value.templates.every(isTemplate)) return null
   if (value.version >= 2 && (!isArray(value.settings) || !value.settings.every(v => isObject(v) && isString(v.key)))) return null
-  if (value.version === 3 && (!isArray(value.ink) || !value.ink.every(isInkDocument))) return null
+  if (value.version >= 3 && (!isArray(value.ink) || !value.ink.every(isInkDocument))) return null
+
+  if (value.version === 4 && (!isArray(value.revisionTopics) || !value.revisionTopics.every(isRevision) || !isArray(value.skills) || !value.skills.every(isSkill) || !isArray(value.milestones) || !value.milestones.every(isMilestone))) return null
 
   return value as unknown as ExportBundle
 }

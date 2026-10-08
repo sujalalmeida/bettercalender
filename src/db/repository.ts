@@ -3,7 +3,7 @@ import { createId } from '../lib/id'
 import { expandRecurrence } from '../lib/recurrence'
 import { addDaysToDate, fromISODate, toISODate, todayISO } from '../lib/dates'
 import { enqueueChange, SYNC_TABLES } from '../lib/syncQueue'
-import type { Category, Day, InkDocument, Recurrence, RepeatRule, SettingsRow, Task, Template } from './types'
+import type { Category, Day, InkDocument, Recurrence, RepeatRule, SettingsRow, Task, Template, RevisionTopic, SkillEntry, Milestone } from './types'
 
 export interface TaskViewModel extends Task {
   /** True when this occurrence only exists virtually (expanded from a Recurrence, not yet written to the tasks table). */
@@ -369,7 +369,7 @@ export function searchIndex(index: SearchResult[], query: string): SearchResult[
 // ---------- Export / Import ----------
 
 export interface ExportBundle {
-  version: 1 | 2 | 3
+  version: 1 | 2 | 3 | 4
   exportedAt: string
   days: Day[]
   tasks: Task[]
@@ -378,19 +378,25 @@ export interface ExportBundle {
   templates: Template[]
   settings?: SettingsRow[]
   ink?: InkDocument[]
+  revisionTopics?: RevisionTopic[]
+  skills?: SkillEntry[]
+  milestones?: Milestone[]
 }
 
 export async function exportAll(): Promise<ExportBundle> {
-  const [days, tasks, recurrences, categories, templates, settings, ink] = await Promise.all([
+  const [days, tasks, recurrences, categories, templates, settings, ink, revisionTopics, skills, milestones] = await Promise.all([
     db.days.toArray(),
     db.tasks.toArray(),
     db.recurrences.toArray(),
     db.categories.toArray(),
     db.templates.toArray(),
     db.settings.toArray(),
-    db.ink.toArray()
+    db.ink.toArray(),
+    db.revisionTopics.toArray(),
+    db.skills.toArray(),
+    db.milestones.toArray()
   ])
-  return { version: 3, exportedAt: new Date().toISOString(), days, tasks, recurrences, categories, templates, settings: settings.filter(row => row.key !== 'syncAccountId'), ink }
+  return { version: 4, exportedAt: new Date().toISOString(), days, tasks, recurrences, categories, templates, settings: settings.filter(row => !['syncAccountId', 'installationId'].includes(row.key)), ink, revisionTopics, skills, milestones }
 }
 
 export type ImportMode = 'merge' | 'replace'
@@ -403,9 +409,10 @@ export async function importAll(bundle: ExportBundle, mode: ImportMode): Promise
       for (const row of rows) removedKeys.push({ table, id: String(row[table === 'days' || table === 'ink' ? 'date' : 'id']) })
     }
   }
-  await db.transaction('rw', [db.days, db.tasks, db.recurrences, db.categories, db.templates, db.settings, db.ink], async () => {
+  await db.transaction('rw', [db.days, db.tasks, db.recurrences, db.categories, db.templates, db.settings, db.ink, db.revisionTopics, db.skills, db.milestones], async () => {
     const installation = await db.settings.get('installationId')
     const syncAccount = await db.settings.get('syncAccountId')
+    const cloudEnabled = await db.settings.get('cloudEnabled')
     if (mode === 'replace') {
       await Promise.all([
         db.days.clear(),
@@ -414,7 +421,10 @@ export async function importAll(bundle: ExportBundle, mode: ImportMode): Promise
         db.categories.clear(),
         db.templates.clear(),
         db.settings.clear(),
-        db.ink.clear()
+        db.ink.clear(),
+        db.revisionTopics.clear(),
+        db.skills.clear(),
+        db.milestones.clear()
       ])
     }
     await db.days.bulkPut(bundle.days)
@@ -423,10 +433,14 @@ export async function importAll(bundle: ExportBundle, mode: ImportMode): Promise
     await db.categories.bulkPut(bundle.categories)
     await db.templates.bulkPut(bundle.templates)
     if (bundle.ink) await db.ink.bulkPut(bundle.ink)
-    if (bundle.settings) await db.settings.bulkPut(bundle.settings.filter(row => row.key !== 'lastExportAt' && row.key !== 'installationId' && row.key !== 'syncAccountId'))
+    if (bundle.revisionTopics) await db.revisionTopics.bulkPut(bundle.revisionTopics)
+    if (bundle.skills) await db.skills.bulkPut(bundle.skills)
+    if (bundle.milestones) await db.milestones.bulkPut(bundle.milestones)
+    if (bundle.settings) await db.settings.bulkPut(bundle.settings.filter(row => row.key !== 'lastExportAt' && row.key !== 'installationId' && row.key !== 'syncAccountId' && row.key !== 'cloudEnabled'))
     await db.settings.put({ key: 'seeded', value: true })
     if (installation) await db.settings.put(installation)
     if (syncAccount) await db.settings.put(syncAccount)
+    if (cloudEnabled) await db.settings.put(cloudEnabled)
   })
   for (const item of removedKeys) await enqueueChange(item.table, item.id)
 }
