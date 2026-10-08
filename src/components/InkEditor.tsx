@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { createPortal } from 'preact/compat'
+import { liveQuery } from 'dexie'
 import type { InkDocument, InkPoint, InkStroke } from '../db/types'
 import { getInk, saveInk } from '../db/repository'
 import { addInkPage, appendStroke, blankInkDocument, clearInkPage, drawInkPage, eraseAt, removeInkPage, INK_HEIGHT, INK_WIDTH } from '../lib/ink'
 import { createId } from '../lib/id'
 
-interface Props { dateISO: string; onClose: () => void }
+interface Props { dateISO: string }
 type Tool = 'pen' | 'eraser'
 const COLORS = ['#182331', '#0066cc', '#16804a', '#a53d2d', '#8955a0']
 const MAX_HISTORY = 40
 
-export default function InkEditor({ dateISO, onClose }: Props) {
+export default function InkEditor({ dateISO }: Props) {
   const [document, setDocument] = useState<InkDocument | null>(null)
   const documentRef = useRef<InkDocument | null>(null)
   const [pageIndex, setPageIndex] = useState(0)
@@ -31,18 +31,28 @@ export default function InkEditor({ dateISO, onClose }: Props) {
   const gestureBeforeRef = useRef<InkDocument | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const dirtyRef = useRef(false)
   const frameRef = useRef<number | null>(null)
 
   useEffect(() => {
     let mounted = true
-    getInk(dateISO).then(saved => {
-      if (!mounted) return
-      const next = saved?.pages.length ? saved : blankInkDocument(dateISO)
-      documentRef.current = next
-      setDocument(next)
-      setStatus('Saved')
-    }).catch(() => { if (mounted) setStatus('Could not load handwriting. Reopen this day to retry.') })
-    return () => { mounted = false; flush(); if (frameRef.current !== null) cancelAnimationFrame(frameRef.current) }
+    const subscription = liveQuery(() => getInk(dateISO)).subscribe({
+      next: saved => {
+        if (!mounted || dirtyRef.current || activePointerRef.current !== null) return
+        const next = saved?.pages.length ? saved : (documentRef.current ?? blankInkDocument(dateISO))
+        if (!documentRef.current || JSON.stringify(documentRef.current.pages) !== JSON.stringify(next.pages)) {
+          documentRef.current = next
+          setDocument(next)
+          undoRef.current = []
+          redoRef.current = []
+          setCurrentPage(Math.min(pageIndexRef.current, next.pages.length - 1))
+          scheduleRender()
+        }
+        setStatus('Saved')
+      },
+      error: () => { if (mounted) setStatus('Could not load handwriting. Reopen this day to retry.') }
+    })
+    return () => { mounted = false; subscription.unsubscribe(); flush(); if (frameRef.current !== null) cancelAnimationFrame(frameRef.current) }
   }, [dateISO])
 
   function setCurrentPage(index: number) {
@@ -84,12 +94,13 @@ export default function InkEditor({ dateISO, onClose }: Props) {
   function flush() {
     if (saveTimerRef.current !== null) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null }
     const snapshot = documentRef.current
-    if (!snapshot) return
+    if (!snapshot || !dirtyRef.current) return
     writeQueueRef.current = writeQueueRef.current.catch(() => undefined).then(() => saveInk(snapshot))
-    writeQueueRef.current.then(() => setStatus('Saved')).catch(() => setStatus('Could not save. Keep this page open and try again.'))
+    writeQueueRef.current.then(() => { if (documentRef.current === snapshot) { dirtyRef.current = false; setStatus('Saved') } }).catch(() => setStatus('Could not save. Keep this page open and try again.'))
   }
 
   function scheduleSave() {
+    dirtyRef.current = true
     setStatus('Saving…')
     if (saveTimerRef.current !== null) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(flush, 400)
@@ -213,13 +224,10 @@ export default function InkEditor({ dateISO, onClose }: Props) {
   }
 
   function handleKeyDown(event: KeyboardEvent) {
-    if (event.key === 'Escape') { event.stopPropagation(); handleClose(); return }
     if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return
     event.preventDefault()
     if (event.shiftKey) redo(); else undo()
   }
-
-  function handleClose() { flush(); onClose() }
 
   async function saveImage() {
     const page = documentRef.current?.pages[pageIndexRef.current]
@@ -240,13 +248,11 @@ export default function InkEditor({ dateISO, onClose }: Props) {
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
-  return createPortal((
-    <div class="ink-editor" role="dialog" aria-modal="true" aria-label={`Handwriting for ${dateISO}`} onKeyDown={handleKeyDown}>
-      <header class="ink-toolbar">
-        <button class="chip-btn" autoFocus onClick={handleClose}>Done</button>
-        <div class="ink-toolbar-title"><strong>Handwriting</strong><span>{dateISO}</span></div>
-        <span class="ink-save-status" role="status">{status}</span>
-      </header>
+  return (
+    <div class="ink-editor ink-editor-inline" role="region" aria-label={`Handwriting for ${dateISO}`} onKeyDown={handleKeyDown}>
+      <div class="ink-scroll scroll-panel" ref={scrollRef}>
+        {document ? <canvas ref={canvasRef} class="ink-canvas" role="img" aria-label={`Handwritten page ${pageIndex + 1} of ${document.pages.length}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishPointer} onPointerCancel={finishPointer} /> : <p>{status}</p>}
+      </div>
       <div class="ink-tools" role="toolbar" aria-label="Drawing tools">
         <button class={`ink-tool ${tool === 'pen' ? 'is-active' : ''}`} aria-pressed={tool === 'pen'} onClick={() => { setTool('pen'); toolRef.current = 'pen' }}>Pen</button>
         <button class={`ink-tool ${tool === 'eraser' ? 'is-active' : ''}`} aria-pressed={tool === 'eraser'} onClick={() => { setTool('eraser'); toolRef.current = 'eraser' }}>Eraser</button>
@@ -259,10 +265,7 @@ export default function InkEditor({ dateISO, onClose }: Props) {
       </div>
       <div class="ink-options">
         <label><input type="checkbox" checked={fingerDraw} onChange={event => setFingerDraw((event.target as HTMLInputElement).checked)} /> Draw with finger</label>
-        <span>Apple Pencil writes here. Fingers scroll by default.</span>
-      </div>
-      <div class="ink-scroll scroll-panel" ref={scrollRef}>
-        {document ? <canvas ref={canvasRef} class="ink-canvas" role="img" aria-label={`Handwritten page ${pageIndex + 1} of ${document.pages.length}`} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishPointer} onPointerCancel={finishPointer} /> : <p>{status}</p>}
+        <span class="ink-save-status" role="status">{status}</span>
       </div>
       <footer class="ink-footer">
         <button class="chip-btn" disabled={pageIndex === 0} onClick={() => setCurrentPage(pageIndex - 1)}>‹ Page</button>
@@ -274,5 +277,5 @@ export default function InkEditor({ dateISO, onClose }: Props) {
         <button class="chip-btn" disabled={!document} onClick={saveImage}>Save image</button>
       </footer>
     </div>
-  ), window.document.body)
+  )
 }

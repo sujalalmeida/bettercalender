@@ -1,6 +1,8 @@
 import Dexie, { type Table } from 'dexie'
 import type { Category, Day, InkDocument, Recurrence, SettingsRow, Task, Template } from './types'
 
+export interface SyncChange { key: string; collection: string; id: string; revision: string }
+
 export class PlanDatabase extends Dexie {
   days!: Table<Day, string>
   ink!: Table<InkDocument, string>
@@ -9,6 +11,7 @@ export class PlanDatabase extends Dexie {
   categories!: Table<Category, string>
   templates!: Table<Template, string>
   settings!: Table<SettingsRow, string>
+  syncChanges!: Table<SyncChange, string>
 
   constructor() {
     super('plan-db')
@@ -25,6 +28,9 @@ export class PlanDatabase extends Dexie {
 
     // v2 adds handwritten pages without modifying existing notes or tasks.
     this.version(2).stores({ ink: '&date, updatedAt' })
+
+    // Pending cloud writes survive reloads and offline periods.
+    this.version(3).stores({ syncChanges: '&key' })
 
     // Example migration for future changes (bumping version adds an index
     // without touching existing rows, so her data is preserved):

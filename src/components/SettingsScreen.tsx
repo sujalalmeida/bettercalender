@@ -8,6 +8,7 @@ import { LEAD_TIME_LABELS, type ReminderLeadTime } from '../lib/ics'
 import { applyThemeClass, updateSetting, useSettings, type Theme } from '../lib/settingsStore'
 import { useEscapeKey } from '../lib/useEscapeKey'
 import { useObservable } from '../lib/useObservable'
+import { useLazyComponent } from '../lib/useLazyComponent'
 
 interface Props {
   onClose: () => void
@@ -21,6 +22,7 @@ export default function SettingsScreen({ onClose }: Props) {
   const templates = useObservable(() => liveQuery(() => db.templates.toArray()), [], [])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importMessage, setImportMessage] = useState<string | null>(null)
+  const CloudSyncSettings = useLazyComponent(() => import('./CloudSyncSettings'), true)
 
   useEscapeKey(onClose)
 
@@ -82,6 +84,7 @@ export default function SettingsScreen({ onClose }: Props) {
       </header>
 
       <div class="settings-body scroll-panel">
+        {CloudSyncSettings ? <CloudSyncSettings /> : <section class="settings-section"><h3>Cloud sync</h3><p class="settings-hint">Loading sync options…</p></section>}
         <section class="settings-section">
           <h3>Appearance</h3>
           <div class="settings-row">
@@ -202,9 +205,10 @@ export default function SettingsScreen({ onClose }: Props) {
         <section class="settings-section">
           <h3>About</h3>
           <p class="settings-hint">
-            Plan stores everything on this device. To install on an iPhone or iPad: open this page in Safari, tap the Share icon, then
+            Plan saves immediately on this device and syncs to Firebase after sign-in when online. To install on an iPhone or iPad: open this page in Safari, tap the Share icon, then
             "Add to Home Screen".
           </p>
+          <p class="settings-hint">Due Soon and app badges update while you use Plan. For alerts when Plan is closed, export a task to Apple Calendar with an alert.</p>
         </section>
       </div>
     </div>

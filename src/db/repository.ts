@@ -2,6 +2,7 @@ import { db } from './db'
 import { createId } from '../lib/id'
 import { expandRecurrence } from '../lib/recurrence'
 import { addDaysToDate, fromISODate, toISODate, todayISO } from '../lib/dates'
+import { enqueueChange, SYNC_TABLES } from '../lib/syncQueue'
 import type { Category, Day, InkDocument, Recurrence, RepeatRule, SettingsRow, Task, Template } from './types'
 
 export interface TaskViewModel extends Task {
@@ -389,14 +390,22 @@ export async function exportAll(): Promise<ExportBundle> {
     db.settings.toArray(),
     db.ink.toArray()
   ])
-  return { version: 3, exportedAt: new Date().toISOString(), days, tasks, recurrences, categories, templates, settings, ink }
+  return { version: 3, exportedAt: new Date().toISOString(), days, tasks, recurrences, categories, templates, settings: settings.filter(row => row.key !== 'syncAccountId'), ink }
 }
 
 export type ImportMode = 'merge' | 'replace'
 
 export async function importAll(bundle: ExportBundle, mode: ImportMode): Promise<void> {
+  const removedKeys: { table: (typeof SYNC_TABLES)[number]; id: string }[] = []
+  if (mode === 'replace') {
+    for (const table of SYNC_TABLES) {
+      const rows = await db[table].toArray() as unknown as Record<string, unknown>[]
+      for (const row of rows) removedKeys.push({ table, id: String(row[table === 'days' || table === 'ink' ? 'date' : 'id']) })
+    }
+  }
   await db.transaction('rw', [db.days, db.tasks, db.recurrences, db.categories, db.templates, db.settings, db.ink], async () => {
     const installation = await db.settings.get('installationId')
+    const syncAccount = await db.settings.get('syncAccountId')
     if (mode === 'replace') {
       await Promise.all([
         db.days.clear(),
@@ -414,8 +423,10 @@ export async function importAll(bundle: ExportBundle, mode: ImportMode): Promise
     await db.categories.bulkPut(bundle.categories)
     await db.templates.bulkPut(bundle.templates)
     if (bundle.ink) await db.ink.bulkPut(bundle.ink)
-    if (bundle.settings) await db.settings.bulkPut(bundle.settings.filter(row => row.key !== 'lastExportAt' && row.key !== 'installationId'))
+    if (bundle.settings) await db.settings.bulkPut(bundle.settings.filter(row => row.key !== 'lastExportAt' && row.key !== 'installationId' && row.key !== 'syncAccountId'))
     await db.settings.put({ key: 'seeded', value: true })
     if (installation) await db.settings.put(installation)
+    if (syncAccount) await db.settings.put(syncAccount)
   })
+  for (const item of removedKeys) await enqueueChange(item.table, item.id)
 }

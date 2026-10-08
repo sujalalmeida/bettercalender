@@ -1,10 +1,10 @@
 # Plan
 
-A fast, offline-first, installable calendar PWA built around one idea: tap a day, plan your day. Everything lives on-device (IndexedDB via Dexie) — no account, no backend, no cost to run.
+A fast, offline-first, installable calendar PWA. It saves immediately in IndexedDB and can sync through Firebase after sign-in.
 
 ## Stack
 
-Vite + TypeScript + Preact, plain CSS (no framework), Dexie for storage, `date-fns` for date math, `vite-plugin-pwa` for the service worker/manifest.
+Vite + TypeScript + Preact, plain CSS, Dexie for local storage, Firebase Authentication and Firestore for sync, `date-fns` for date math, `vite-plugin-pwa` for the service worker/manifest.
 
 ## Run it locally
 
@@ -12,6 +12,17 @@ Vite + TypeScript + Preact, plain CSS (no framework), Dexie for storage, `date-f
 npm install
 npm run dev
 ```
+
+Copy `.env.example` to `.env.local` and enter your Firebase web app config. The local `.env.local` is ignored by Git. Vite embeds `VITE_` values in the browser build, so Firebase security must come from Authentication and Firestore rules, not secrecy of the web API key.
+
+## Enable Firebase sync
+
+1. In the Firebase console for the project, enable **Authentication → Sign-in method → Email/Password**.
+2. Create a **Cloud Firestore** database and deploy [firestore.rules](firestore.rules). With the Firebase CLI authenticated, run `firebase deploy --only firestore:rules --project bettecalender`. The rules restrict each user's records to that signed-in account.
+3. Configure the same `VITE_FIREBASE_*` environment values on your hosting provider, then rebuild and deploy. A `.env.local` on the Mac does not configure a remote deployment.
+4. Open **Settings → Cloud sync**, create an account, then sign in with that same account on the iPad. Sign-in alone does not prove the backend is configured; wait for “Saved on this device and synced to Firebase.”
+
+Changes are written to Dexie first. Pending cloud changes survive offline use and reloads. The first sign-in merges existing on-device records with cloud records; later changes sync by record, including deletions. A local data set is linked to its first signed-in account to prevent mixing two private calendars on one device. Keep JSON exports as an additional backup, especially for extensive handwriting. Firebase cannot be tested end to end without enabling Authentication, Firestore, and the rules in the Firebase project.
 
 Open the printed `http://localhost:5173` URL. To test the interface on a phone on the same Wi-Fi, run `npm run dev -- --host 0.0.0.0` and open `http://<your-Mac-LAN-IP>:5173`. iOS requires HTTPS for service workers and Home Screen installation, so use the deployed URL for offline and install tests.
 
@@ -62,11 +73,11 @@ The app shows this same guidance itself the first time it's opened in mobile Saf
 
 ## Back up your data
 
-Settings → **Export JSON** downloads everything (typed notes, handwritten pages, tasks, recurrences, categories, templates, settings) as one file. **Import JSON** restores it, with a choice to merge into or replace existing data. Everything lives in this browser's IndexedDB only — exporting is the only way to move data to a new device or recover from clearing site data. Older version 1 and 2 backups still import.
+Settings → **Export JSON** downloads everything (typed notes, handwritten pages, tasks, recurrences, categories, templates, settings) as one file. **Import JSON** restores it, with a choice to merge into or replace existing data. Offline data remains in this browser's IndexedDB. After cloud sync is configured and she signs in, Firebase provides a second copy and cross-device access. Older version 1 and 2 backups still import.
 
 ## Apple Pencil on iPad
 
-Open a day and tap **Handwrite with Apple Pencil**. The full-screen page supports pressure-sensitive ink, color and size choices, stroke erasing, undo/redo, multiple pages, and saving the current page as a PNG. Pencil strokes save automatically in IndexedDB and are included in JSON backups. Fingers scroll the page by default; turn on **Draw with finger** to use a finger or a basic stylus as a pen. A mouse also draws for Mac testing.
+Open a day. The typed Notes field is at the top and the Apple Pencil writing area is directly below it. The canvas supports pressure-sensitive ink, color and size choices, stroke erasing, undo/redo, multiple pages, and saving the current page as a PNG. Pencil strokes save automatically in IndexedDB and are included in sync and JSON backups. Fingers scroll the page by default; turn on **Draw with finger** to use a finger or a basic stylus as a pen. A mouse also draws for Mac testing.
 
 The ordinary Notes area, task field, and search field remain standard text controls, so iPadOS Scribble can turn Pencil handwriting there into typed text. The freehand page keeps writing as ink. Browser Pointer Events expose Pencil pressure and tilt on supported iPadOS versions; hardware-specific double-tap and squeeze gestures are not part of this web UI.
 
@@ -82,13 +93,13 @@ src/
   styles/       Plain CSS (theme.css = tokens/dark mode, app.css = components)
 ```
 
-All data access goes through `src/db/repository.ts`. That's intentional: a future sync backend (Phase 2) is a matter of changing what's behind those functions, not rewriting the UI.
+Most local data access goes through `src/db/repository.ts`. `src/lib/syncQueue.ts` records local changes, and `src/lib/cloudSync.ts` reconciles them with Firestore.
 
 ## What's implemented vs. deferred
 
 Implemented: month grid + swipe navigation, the expand/collapse interaction (FLIP, phone overlay vs. tablet in-grid expand, reduced-motion fallback), notes with debounced autosave, checklist (add/complete/reorder/swipe-to-delete-with-undo), per-task time/category/deadline, recurrence (daily/weekdays/weekly/monthly/custom, with "this occurrence" vs "all future" edits), roll-over banner, Due Soon strip + exam countdown, week view, search, `.ics` export with reminders, JSON export/import (including settings), Home Screen app badge, full settings (theme/week-start/categories/template tasks/reminder default), install guide, update-available toast.
 
-Deferred by design: Web Push notifications (`src/lib/webPushStub.ts` documents the interface and migration steps; it requires a backend).
+**Notifications:** Due Soon, overdue items, and app badge counts update in the app. A task's Calendar export includes an Apple Calendar alert that works after import. Plan does not currently deliver its own device push notifications while closed. iPadOS Home Screen web apps support Web Push, but that requires a push subscription, permission, and a server to schedule/send reminders; Firebase database sync alone does not send them. `src/lib/webPushStub.ts` documents the unimplemented push interface.
 
 The first successful launch creates an installation marker. If browser storage is later wiped, Plan shows a recovery message with a prompt to import a backup. If the browser denies persistent storage, Plan explains why regular exports matter.
 
