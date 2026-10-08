@@ -1,0 +1,74 @@
+:root {
+  --color-bg: #ffffff;
+  --color-bg-elevated: #f7f7f8;
+  --color-bg-sunken: #efeff1;
+  --color-text: #0b0b0d;
+  --color-text-secondary: #6b6b70;
+  --color-text-tertiary: #6b6b70;
+  --color-border: rgba(0, 0, 0, 0.09);
+  --color-accent: #0066cc;
+  --color-accent-contrast: #ffffff;
+  --color-danger: #ff3b30;
+  --color-success: #34c759;
+  --color-backdrop: rgba(10, 10, 12, 0.35);
+  --color-dim: rgba(0, 0, 0, 0.04);
+  --color-today-ring: var(--color-accent);
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 1px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(0, 0, 0, 0.1);
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+
+  --blur-backdrop: blur(20px);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg: #000000;
+    --color-bg-elevated: #1c1c1e;
+    --color-bg-sunken: #121214;
+    --color-text: #f5f5f7;
+    --color-text-secondary: #a1a1a6;
+    --color-text-tertiary: #a1a1a6;
+    --color-border: rgba(255, 255, 255, 0.12);
+    --color-accent: #4aa3ff;
+    --color-accent-contrast: #000000;
+    --color-danger: #ff453a;
+    --color-success: #30d158;
+    --color-backdrop: rgba(0, 0, 0, 0.55);
+    --color-dim: rgba(255, 255, 255, 0.06);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-bg: #000000;
+  --color-bg-elevated: #1c1c1e;
+  --color-bg-sunken: #121214;
+  --color-text: #f5f5f7;
+  --color-text-secondary: #a1a1a6;
+  --color-text-tertiary: #a1a1a6;
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-accent: #4aa3ff;
+  --color-accent-contrast: #000000;
+  --color-danger: #ff453a;
+  --color-success: #30d158;
+  --color-backdrop: rgba(0, 0, 0, 0.55);
+  --color-dim: rgba(255, 255, 255, 0.06);
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
