@@ -11,7 +11,6 @@ import { WeekView } from './components/WeekView'
 import { addDaysToDate, fromISODate, isCurrentMonth, toISODate } from './lib/dates'
 import { applyThemeClass, useSettings } from './lib/settingsStore'
 import { setAppBadgeCount } from './lib/appBadge'
-import { useIsTablet } from './lib/useMediaQuery'
 import { useLazyComponent } from './lib/useLazyComponent'
 import { useObservable } from './lib/useObservable'
 
@@ -32,7 +31,6 @@ function fallbackRect(): DOMRect {
 
 export function App({ initialStorageNotice }: { initialStorageNotice: string | null }) {
   const settings = useSettings()
-  const isTablet = useIsTablet()
 
   const [view, setView] = useState<View>('month')
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -142,25 +140,21 @@ export function App({ initialStorageNotice }: { initialStorageNotice: string | n
             currentMonth={currentMonth}
             onMonthChange={setCurrentMonth}
             weekStartsOn={weekStartsOn}
-            expandedDate={isTablet ? expandedDate : null}
+            expandedDate={expandedDate}
             onExpand={handleExpand}
             onCollapse={handleCollapse}
-            onNavigateDay={handleNavigateDay}
           />
         ) : view === 'week' ? (
           <WeekView
             anchorDate={weekAnchor}
             onAnchorChange={setWeekAnchor}
             weekStartsOn={weekStartsOn}
-            expandedDate={isTablet ? expandedDate : null}
             onExpand={handleExpand}
-            onCollapse={handleCollapse}
-            onNavigateDay={handleNavigateDay}
           />
         ) : LearningScreen ? <LearningScreen kind={view} /> : null}
       </div>
 
-      {!isTablet && expandedDate && (
+      {expandedDate && (
         <ExpandOverlay dateISO={expandedDate} originRect={origin} onClose={handleCollapse} onNavigateDay={handleNavigateDay} />
       )}
 

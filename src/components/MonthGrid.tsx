@@ -14,11 +14,8 @@ import {
   toISODate
 } from '../lib/dates'
 import { prefersReducedMotion } from '../lib/flip'
-import { useGridFlip } from '../lib/useGridFlip'
-import { useIsTablet } from '../lib/useMediaQuery'
 import { useObservable } from '../lib/useObservable'
 import { DayCell } from './DayCell'
-import { DayPanelContent } from './DayPanelContent'
 
 interface Props {
   currentMonth: Date
@@ -27,14 +24,9 @@ interface Props {
   expandedDate: string | null
   onExpand: (dateISO: string, originRect: DOMRect) => void
   onCollapse: () => void
-  onNavigateDay: (delta: 1 | -1) => void
 }
 
-const SPAN_COLS = 4
-const SPAN_ROWS = 3
-
-export function MonthGrid({ currentMonth, onMonthChange, weekStartsOn, expandedDate, onExpand, onCollapse, onNavigateDay }: Props) {
-  const isTablet = useIsTablet()
+export function MonthGrid({ currentMonth, onMonthChange, weekStartsOn, expandedDate, onExpand, onCollapse }: Props) {
   const gridRef = useRef<HTMLDivElement>(null)
   const direction = useRef<1 | -1>(1)
   const swipeStart = useRef<{ x: number; y: number } | null>(null)
@@ -52,8 +44,6 @@ export function MonthGrid({ currentMonth, onMonthChange, weekStartsOn, expandedD
   const categories = useObservable(() => liveQuery(() => db.categories.orderBy('order').toArray()), [], [])
   const categoryById = new Map(categories.map((c) => [c.id, c]))
   const notesByDate = new Map(dayRows.map((d) => [d.date, d.notes]))
-
-  useGridFlip(gridRef, `${expandedDate ?? ''}-${isTablet}`)
 
   useLayoutEffect(() => {
     const el = gridRef.current
@@ -147,31 +137,11 @@ export function MonthGrid({ currentMonth, onMonthChange, weekStartsOn, expandedD
         onPointerUp={onPointerUp}
       >
         {Array.from({ length: totalRows }, (_, rowIndex) => <div role="row" class="month-grid-row" key={rowIndex}>
-          {days.slice(rowIndex * 7, rowIndex * 7 + 7).map((date, colIndex) => {
-          const index = rowIndex * 7 + colIndex
+          {days.slice(rowIndex * 7, rowIndex * 7 + 7).map((date) => {
           const dateISO = toISODate(date)
           const isExpanded = expandedDate === dateISO
           const tasks = tasksByDate[dateISO] ?? []
           const notes = notesByDate.get(dateISO) ?? ''
-
-          if (isExpanded && isTablet) {
-            const col = index % 7
-            const row = Math.floor(index / 7)
-            const colStart = Math.min(col, 7 - SPAN_COLS) + 1
-            const rowStart = Math.min(row, Math.max(totalRows - SPAN_ROWS, 0)) + 1
-            return (
-              <div
-                key={dateISO}
-                role="gridcell"
-                aria-label={formatDayTitle(date)}
-                data-flip-id={dateISO}
-                class="day-cell-expanded-tile"
-                style={{ gridColumn: `${colStart} / span ${SPAN_COLS}`, gridRow: `${rowStart} / span ${SPAN_ROWS}` }}
-              >
-                <DayPanelContent dateISO={dateISO} compact onClose={onCollapse} onNavigateDay={onNavigateDay} />
-              </div>
-            )
-          }
 
           return (
             <DayCell

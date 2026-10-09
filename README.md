@@ -77,7 +77,7 @@ Settings → **Export JSON** downloads everything (typed notes, handwritten page
 
 ## Apple Pencil on iPad
 
-Open a day. The typed Notes field is at the top and the Apple Pencil writing area is directly below it. The canvas supports pressure-sensitive ink, color and size choices, stroke erasing, undo/redo, multiple pages, and saving the current page as a PNG. Pencil strokes save automatically in IndexedDB and are included in sync and JSON backups. Fingers scroll the page by default; turn on **Draw with finger** to use a finger or a basic stylus as a pen. A mouse also draws for Mac testing.
+Open a day. The Apple Pencil whiteboard is first and fills most of the opened day; typed Notes are below it. On iPad, the day opens as a large animated card over the month or week. The canvas supports pressure-sensitive ink, color and size choices, stroke erasing, undo/redo, multiple pages, and saving the current page as a PNG. Pencil strokes save automatically in IndexedDB and are included in sync and JSON backups. Fingers scroll the page by default; turn on **Draw with finger** to use a finger or a basic stylus as a pen. A mouse also draws for Mac testing.
 
 The ordinary Notes area, task field, and search field remain standard text controls, so iPadOS Scribble can turn Pencil handwriting there into typed text. The freehand page keeps writing as ink. Browser Pointer Events expose Pencil pressure and tilt on supported iPadOS versions; hardware-specific double-tap and squeeze gestures are not part of this web UI.
 
@@ -97,7 +97,7 @@ Most local data access goes through `src/db/repository.ts`. `src/lib/syncQueue.t
 
 ## What's implemented vs. deferred
 
-Implemented: month grid + swipe navigation, the expand/collapse interaction (FLIP, phone overlay vs. tablet in-grid expand, reduced-motion fallback), notes with debounced autosave, checklist (add/complete/reorder/swipe-to-delete-with-undo), per-task time/category/deadline, recurrence (daily/weekdays/weekly/monthly/custom, with "this occurrence" vs "all future" edits), roll-over banner, Due Soon strip + exam countdown, week view, search, `.ics` export with reminders, JSON export/import (including settings), Home Screen app badge, full settings (theme/week-start/categories/template tasks/reminder default), install guide, update-available toast.
+Implemented: month grid + swipe navigation, the expand/collapse interaction (FLIP, large animated day card on phone and tablet, reduced-motion fallback), notes with debounced autosave, checklist (add/complete/reorder/swipe-to-delete-with-undo), per-task time/category/deadline, recurrence (daily/weekdays/weekly/monthly/custom, with "this occurrence" vs "all future" edits), roll-over banner, Due Soon strip + exam countdown, week view, search, `.ics` export with reminders, JSON export/import (including settings), Home Screen app badge, full settings (theme/week-start/categories/template tasks/reminder default), install guide, update-available toast.
 
 **Notifications:** Due Soon, overdue items, and app badge counts update in the app. A task's Calendar export includes an Apple Calendar alert that works after import. Plan does not currently deliver its own device push notifications while closed. iPadOS Home Screen web apps support Web Push, but that requires a push subscription, permission, and a server to schedule/send reminders; Firebase database sync alone does not send them. `src/lib/webPushStub.ts` documents the unimplemented push interface.
 
@@ -105,9 +105,9 @@ The first successful launch creates an installation marker. If browser storage i
 
 ## Manual QA checklist (iPhone / iPad)
 
-- [ ] Tap a day → expands smoothly; tap again / swipe down / tap backdrop / tap "Done" → collapses back to the same box.
-- [ ] On iPad, expanding a day grows it in place in the grid (not a full-screen sheet) and neighboring days reflow.
-- [ ] Typing in Notes never gets hidden behind the keyboard; the keyboard doesn't pop up just from expanding a day.
+- [ ] Tap a day → expands smoothly; swipe down / tap backdrop / tap "Done" → collapses back to the same box.
+- [ ] On iPad, opening a day shows a large animated card with the whiteboard first and enough room to write.
+- [ ] Typing in Notes below the whiteboard never gets hidden behind the keyboard; the keyboard doesn't pop up just from expanding a day.
 - [ ] On iPad, use Apple Pencil to write in a day; test pressure changes, eraser, undo/redo, page changes, rotation, reopen, and JSON backup/import.
 - [ ] Try Scribble in Notes and Add a task; verify a finger scrolls the handwriting page until Draw with finger is enabled.
 - [ ] Turn on Airplane Mode, re-open the installed app — it opens instantly and everything still works.

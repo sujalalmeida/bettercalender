@@ -4,19 +4,15 @@ import { getInkDatesForRange, getTasksForRange, type TaskViewModel } from '../db
 import { addDaysToDate, formatDayTitle, getWeekDays, isTodayDate, toISODate } from '../lib/dates'
 import { useObservable } from '../lib/useObservable'
 import { CategoryDot } from './CategoryDot'
-import { DayPanelContent } from './DayPanelContent'
 
 interface Props {
   anchorDate: Date
   onAnchorChange: (date: Date) => void
   weekStartsOn: 0 | 1
-  expandedDate: string | null
   onExpand: (dateISO: string, originRect: DOMRect) => void
-  onCollapse: () => void
-  onNavigateDay: (delta: 1 | -1) => void
 }
 
-export function WeekView({ anchorDate, onAnchorChange, weekStartsOn, expandedDate, onExpand, onCollapse, onNavigateDay }: Props) {
+export function WeekView({ anchorDate, onAnchorChange, weekStartsOn, onExpand }: Props) {
   const days = getWeekDays(anchorDate, weekStartsOn)
   const rangeStart = toISODate(days[0])
   const rangeEnd = toISODate(days[days.length - 1])
@@ -47,16 +43,7 @@ export function WeekView({ anchorDate, onAnchorChange, weekStartsOn, expandedDat
         {days.map((date) => {
           const dateISO = toISODate(date)
           const tasks = tasksByDate[dateISO] ?? []
-          const isExpanded = expandedDate === dateISO
           const doneCount = tasks.filter((t) => t.done).length
-
-          if (isExpanded) {
-            return (
-              <div class="week-day-card week-day-card-expanded" key={dateISO}>
-                <DayPanelContent dateISO={dateISO} compact onClose={onCollapse} onNavigateDay={onNavigateDay} />
-              </div>
-            )
-          }
 
           return (
             <button

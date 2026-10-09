@@ -12,10 +12,9 @@ interface Props {
   dateISO: string
   onNavigateDay: (delta: 1 | -1) => void
   onClose: () => void
-  compact?: boolean
 }
 
-export function DayPanelContent({ dateISO, onNavigateDay, onClose, compact }: Props) {
+export function DayPanelContent({ dateISO, onNavigateDay, onClose }: Props) {
   const settings = useSettings()
   const InkEditor = useLazyComponent(() => import('./InkEditor'), true)
 
@@ -28,7 +27,7 @@ export function DayPanelContent({ dateISO, onNavigateDay, onClose, compact }: Pr
   const doneCount = dayTasks.filter((t) => t.done).length
 
   return (
-    <div class={`day-panel ${compact ? 'day-panel-compact' : ''}`}>
+    <div class="day-panel">
       <header class="day-panel-header" onClick={e => { if (!(e.target as HTMLElement).closest('button')) onClose() }}>
         <button class="day-panel-nav" aria-label="Previous day" onClick={() => onNavigateDay(-1)}>
           ‹
@@ -50,8 +49,13 @@ export function DayPanelContent({ dateISO, onNavigateDay, onClose, compact }: Pr
       </header>
 
       <div class="day-panel-body scroll-panel">
-        <NotesEditor key={dateISO} dateISO={dateISO} initialNotes={day?.notes ?? ''} />
-        {InkEditor ? <InkEditor key={dateISO} dateISO={dateISO} /> : <div class="ink-loading">Preparing handwriting…</div>}
+        <section class="day-panel-handwriting" aria-label="Apple Pencil whiteboard">
+          {InkEditor ? <InkEditor key={dateISO} dateISO={dateISO} /> : <div class="ink-loading">Preparing handwriting…</div>}
+        </section>
+        <section class="day-panel-text-notes" aria-label="Typed notes">
+          <h3>Typed notes</h3>
+          <NotesEditor key={dateISO} dateISO={dateISO} initialNotes={day?.notes ?? ''} />
+        </section>
 
         <Checklist dateISO={dateISO} tasks={dayTasks} categories={categories} defaultLeadTime={settings.reminderLeadTime} />
 
