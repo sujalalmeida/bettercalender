@@ -75,6 +75,10 @@ The app shows this same guidance itself the first time it's opened in mobile Saf
 
 Settings → **Export JSON** downloads everything (typed notes, handwritten pages, tasks, recurrences, categories, templates, settings) as one file. **Import JSON** restores it, with a choice to merge into or replace existing data. Offline data remains in this browser's IndexedDB. After cloud sync is configured and she signs in, Firebase provides a second copy and cross-device access. Older version 1, 2 and 3 backups still import.
 
+## Daily timeline and refreshed design
+
+The Today tab opens a daily timeline with a seven-day date strip, anytime and scheduled tasks, progress, quick task entry, and a direct link to the day's checklist and Apple Pencil whiteboard. Month, Week, Revision, Skills, Milestones, search, settings, backups and sync remain available. The interface uses a monochrome editorial style with no gradients. The timeline reads and writes the same task records as Month and Week.
+
 ## Apple Pencil on iPad
 
 Open a day. The Apple Pencil whiteboard is first and fills most of the opened day; typed Notes are below it. On iPad, the day opens as a large animated card over the month or week. The canvas supports pressure-sensitive ink, color and size choices, stroke erasing, undo/redo, multiple pages, and saving the current page as a PNG. Pencil strokes save automatically in IndexedDB and are included in sync and JSON backups. Fingers scroll the page by default; turn on **Draw with finger** to use a finger or a basic stylus as a pen. A mouse also draws for Mac testing.
@@ -97,7 +101,7 @@ Most local data access goes through `src/db/repository.ts`. `src/lib/syncQueue.t
 
 ## What's implemented vs. deferred
 
-Implemented: month grid + swipe navigation, the expand/collapse interaction (FLIP, large animated day card on phone and tablet, reduced-motion fallback), notes with debounced autosave, checklist (add/complete/reorder/swipe-to-delete-with-undo), per-task time/category/deadline, recurrence (daily/weekdays/weekly/monthly/custom, with "this occurrence" vs "all future" edits), roll-over banner, Due Soon strip + exam countdown, week view, search, `.ics` export with reminders, JSON export/import (including settings), Home Screen app badge, full settings (theme/week-start/categories/template tasks/reminder default), install guide, update-available toast.
+Implemented: daily timeline, month grid + swipe navigation, the expand/collapse interaction (FLIP, large animated day card on phone and tablet, reduced-motion fallback), notes with debounced autosave, checklist (add/complete/reorder/swipe-to-delete-with-undo), per-task time/category/deadline, recurrence (daily/weekdays/weekly/monthly/custom, with "this occurrence" vs "all future" edits), roll-over banner, Due Soon strip + exam countdown, week view, search, `.ics` export with reminders, JSON export/import (including settings), Home Screen app badge, full settings (theme/week-start/categories/template tasks/reminder default), install guide, update-available toast.
 
 **Notifications:** Due Soon, overdue items, and app badge counts update in the app. A task's Calendar export includes an Apple Calendar alert that works after import. Plan does not currently deliver its own device push notifications while closed. iPadOS Home Screen web apps support Web Push, but that requires a push subscription, permission, and a server to schedule/send reminders; Firebase database sync alone does not send them. `src/lib/webPushStub.ts` documents the unimplemented push interface.
 

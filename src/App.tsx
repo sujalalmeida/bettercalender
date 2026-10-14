@@ -1,5 +1,5 @@
 import { liveQuery } from 'dexie'
-import { useEffect, useMemo, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { getBadgeCount } from './db/repository'
 import { DueSoonStrip } from './components/DueSoonStrip'
 import { ExpandOverlay } from './components/ExpandOverlay'
@@ -8,13 +8,14 @@ import { MonthGrid } from './components/MonthGrid'
 import { RolloverBanner } from './components/RolloverBanner'
 import { UpdateToast } from './components/UpdateToast'
 import { WeekView } from './components/WeekView'
+import { TodayTimeline } from './components/TodayTimeline'
 import { addDaysToDate, fromISODate, isCurrentMonth, toISODate } from './lib/dates'
 import { applyThemeClass, useSettings } from './lib/settingsStore'
 import { setAppBadgeCount } from './lib/appBadge'
 import { useLazyComponent } from './lib/useLazyComponent'
 import { useObservable } from './lib/useObservable'
 
-type View = 'month' | 'week' | 'revision' | 'skills' | 'milestones'
+type View = 'today' | 'month' | 'week' | 'revision' | 'skills' | 'milestones'
 
 function isIOS(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window)
@@ -32,7 +33,8 @@ function fallbackRect(): DOMRect {
 export function App({ initialStorageNotice }: { initialStorageNotice: string | null }) {
   const settings = useSettings()
 
-  const [view, setView] = useState<View>('month')
+  const [view, setView] = useState<View>('today')
+  const [timelineDate, setTimelineDate] = useState(new Date())
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [weekAnchor, setWeekAnchor] = useState(new Date())
   const [expandedDate, setExpandedDate] = useState<string | null>(null)
@@ -41,6 +43,15 @@ export function App({ initialStorageNotice }: { initialStorageNotice: string | n
   const [showSettings, setShowSettings] = useState(false)
   const [showInstallGuide, setShowInstallGuide] = useState(false)
   const [storageNotice, setStorageNotice] = useState(initialStorageNotice)
+  const tabsRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    tabsRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.scrollIntoView({
+      block: 'nearest',
+      inline: 'center',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+    })
+  }, [view])
 
   useEffect(() => {
     applyThemeClass(settings.theme)
@@ -93,6 +104,7 @@ export function App({ initialStorageNotice }: { initialStorageNotice: string | n
     setExpandedDate(toISODate(next))
     if (!isCurrentMonth(next, currentMonth)) setCurrentMonth(next)
     setWeekAnchor(next)
+    setTimelineDate(next)
   }
 
   function jumpToDate(dateISO: string) {
@@ -112,12 +124,14 @@ export function App({ initialStorageNotice }: { initialStorageNotice: string | n
 
   return (
     <div class="app-shell">
-      <div class="app-topbar ui-chrome" style={{ paddingTop: 'var(--safe-top)' }}>
-        <button class="icon-btn" aria-label="Search" onClick={() => setShowSearch(true)}>
-          ⌕
-        </button>
-        <div class="topbar-tabs" role="tablist" aria-label="App sections">
+      <div class="app-topbar ui-chrome">
+        <div class="app-topbar-leading">
+          <span class="app-brand"><span class="app-brand-mark">P</span><strong>Plan</strong></span>
+          <button class="icon-btn" aria-label="Search" onClick={() => setShowSearch(true)}>⌕</button>
+        </div>
+        <div class="topbar-tabs" role="tablist" aria-label="App sections" ref={tabsRef}>
           <div class="segmented-control">
+            <button role="tab" aria-selected={view === 'today'} class={view === 'today' ? 'is-active' : ''} onClick={() => setView('today')}>Today</button>
             <button role="tab" aria-selected={view === 'month'} class={view === 'month' ? 'is-active' : ''} onClick={() => setView('month')}>Month</button>
             <button role="tab" aria-selected={view === 'week'} class={view === 'week' ? 'is-active' : ''} onClick={() => setView('week')}>Week</button>
           </div>
@@ -130,12 +144,14 @@ export function App({ initialStorageNotice }: { initialStorageNotice: string | n
         </button>
       </div>
 
-      {(view === 'month' || view === 'week') && <DueSoonStrip onJumpToDate={jumpToDate} />}
+      {(view === 'today' || view === 'month' || view === 'week') && <DueSoonStrip onJumpToDate={jumpToDate} />}
       {storageNotice && <div class="storage-notice" role="alert"><span>{storageNotice}</span><button class="chip-btn" onClick={() => setStorageNotice(null)}>OK</button></div>}
-      {(view === 'month' || view === 'week') && <RolloverBanner onReview={jumpToDate} />}
+      {(view === 'today' || view === 'month' || view === 'week') && <RolloverBanner onReview={jumpToDate} />}
 
       <div class="app-view">
-        {view === 'month' ? (
+        {view === 'today' ? (
+          <TodayTimeline date={timelineDate} onDateChange={setTimelineDate} weekStartsOn={weekStartsOn} onOpenDay={handleExpand} />
+        ) : view === 'month' ? (
           <MonthGrid
             currentMonth={currentMonth}
             onMonthChange={setCurrentMonth}

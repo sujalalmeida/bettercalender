@@ -7,8 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Plan" />
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+  <meta name="theme-color" content="#111212" />
   <meta name="description" content="A fast, offline-first month calendar for planning your days." />
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
   <link rel="icon" href="/icons/icon-192.png" />
@@ -19,9 +18,10 @@
     (function () {
       try {
         var stored = localStorage.getItem('plan.theme');
-        var dark = stored === 'dark' || (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        document.documentElement.style.background = dark ? '#000' : '#fff';
-        document.documentElement.setAttribute('data-theme', stored === 'light' || stored === 'dark' ? stored : 'system');
+        var theme = stored || 'dark';
+        var dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.style.background = dark ? '#111212' : '#f3f3f0';
+        document.documentElement.setAttribute('data-theme', theme);
       } catch (e) {}
     })();
   </script>

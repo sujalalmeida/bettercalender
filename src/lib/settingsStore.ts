@@ -17,7 +17,7 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   weekStartsOn: 0,
-  theme: 'system',
+  theme: 'dark',
   reminderLeadTime: '10-min',
   lastExportAt: null,
   installGuideDismissed: false,
@@ -43,6 +43,7 @@ export async function updateSetting<K extends keyof AppSettings>(key: K, value: 
 
 export function applyThemeClass(theme: Theme): void {
   const root = document.documentElement
+  root.style.removeProperty('background')
   if (theme === 'system') {
     root.removeAttribute('data-theme')
   } else {

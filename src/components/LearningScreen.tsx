@@ -60,7 +60,7 @@ export default function LearningScreen({ kind }: Props) {
   const sortedMilestones = [...milestones].sort((a,b) => (a.status === 'done' || a.status === 'cancelled' ? 1 : 0) - (b.status === 'done' || b.status === 'cancelled' ? 1 : 0) || (a.dueDate || '9999').localeCompare(b.dueDate || '9999'))
 
   return <section class="workspace-screen">
-    <header class="workspace-header"><div><span class="workspace-eyebrow">FINAL YEAR</span><h1>{heading}</h1><p>{description}</p></div><div class="workspace-actions"><button class="workspace-secondary" onClick={() => { reset(); setShowAI(!showAI) }}>✦ Suggest with Gemini</button><button class="workspace-primary" onClick={() => { reset(); setShowAI(false); setShowForm(true) }}>+ Add {kind === 'revision' ? 'topic' : kind === 'skills' ? 'entry' : 'milestone'}</button></div></header>
+    <header class="workspace-header"><div><span class="workspace-eyebrow">FINAL YEAR</span><h1>{heading}</h1><p>{description}</p></div><div class="workspace-actions"><button class="workspace-secondary" onClick={() => { reset(); setShowAI(!showAI) }}>Suggest with Gemini</button><button class="workspace-primary" onClick={() => { reset(); setShowAI(false); setShowForm(true) }}>+ Add {kind === 'revision' ? 'topic' : kind === 'skills' ? 'entry' : 'milestone'}</button></div></header>
     {error && <p class="workspace-error" role="alert">{error}</p>}
     {showAI && AIImport && <AIImport target={kind} onClose={() => setShowAI(false)} />}
     {showForm && <form class="workspace-form" onSubmit={submit}>
