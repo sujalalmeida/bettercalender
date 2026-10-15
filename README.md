@@ -79,6 +79,10 @@ Settings → **Export JSON** downloads everything (typed notes, handwritten page
 
 The Today tab opens a daily timeline with a seven-day date strip, anytime and scheduled tasks, progress, quick task entry, and a direct link to the day's checklist and Apple Pencil whiteboard. Month, Week, Revision, Skills, Milestones, search, settings, backups and sync remain available. The interface uses a monochrome editorial style with no gradients. The timeline reads and writes the same task records as Month and Week.
 
+## Focus Garden
+
+The **Focus** button opens a separate window with a stopwatch and a green garden. The garden starts empty, then grows lilies, white roses and red roses as focused time passes. Pause and continue the timer, or start a new garden. The current stopwatch is saved in this browser so a refresh keeps its time and flowers. Closing the focus window pauses the timer; focus progress is local to that browser and is not included in Firebase sync or JSON backups.
+
 ## Apple Pencil on iPad
 
 Open a day. The Apple Pencil whiteboard is first and fills most of the opened day; typed Notes are below it. On iPad, the day opens as a large animated card over the month or week. The canvas supports pressure-sensitive ink, color and size choices, stroke erasing, undo/redo, multiple pages, and saving the current page as a PNG. Pencil strokes save automatically in IndexedDB and are included in sync and JSON backups. Fingers scroll the page by default; turn on **Draw with finger** to use a finger or a basic stylus as a pen. A mouse also draws for Mac testing.

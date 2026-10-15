@@ -46,4 +46,7 @@ async function start() {
   }
 }
 
-void start()
+if (new URLSearchParams(window.location.search).get('focus') === '1') {
+  void import('./components/FocusMode').then(({ FocusMode }) => render(<FocusMode />, root))
+}
+else void start()

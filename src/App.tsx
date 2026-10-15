@@ -139,6 +139,7 @@ export function App({ initialStorageNotice }: { initialStorageNotice: string | n
             {(['revision','skills','milestones'] as const).map(section => <button role="tab" aria-selected={view === section} class={view === section ? 'is-active' : ''} onClick={() => { setExpandedDate(null); setView(section) }}>{section[0].toUpperCase()+section.slice(1)}</button>)}
           </div>
         </div>
+        <a class="focus-launch" href="?focus=1" target="plan-focus" aria-label="Open Focus Garden in a separate window">Focus <span aria-hidden="true">↗</span></a>
         <button class="icon-btn" aria-label="Settings" onClick={() => setShowSettings(true)}>
           ⚙
         </button>
