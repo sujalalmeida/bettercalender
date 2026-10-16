@@ -21,7 +21,10 @@ export async function getDay(dateISO: string): Promise<Day | undefined> {
 }
 
 export async function saveDayNotes(dateISO: string, notes: string): Promise<void> {
-  await db.days.put({ date: dateISO, notes, updatedAt: Date.now() })
+  await db.transaction('rw', db.days, async () => {
+    const previous = await db.days.get(dateISO)
+    await db.days.put({ ...previous, date: dateISO, notes, updatedAt: Date.now() })
+  })
 }
 
 export async function getInk(dateISO: string): Promise<InkDocument | undefined> {

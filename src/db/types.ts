@@ -11,6 +11,10 @@ export interface RepeatRule {
 export interface Day {
   date: string // YYYY-MM-DD, primary key
   notes: string
+  /** Searchable calendar preview of the saved Pencil pages. */
+  inkText?: string
+  /** Ink version that produced inkText; used to avoid repeat AI requests. */
+  inkTextSourceUpdatedAt?: number
   updatedAt: number
 }
 

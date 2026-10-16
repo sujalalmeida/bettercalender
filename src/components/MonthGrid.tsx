@@ -1,5 +1,5 @@
 import { liveQuery } from 'dexie'
-import { useLayoutEffect, useRef } from 'preact/hooks'
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import { db } from '../db/db'
 import { getInkDatesForRange, getTasksForRange, type TaskViewModel } from '../db/repository'
 import {
@@ -16,6 +16,7 @@ import {
 import { prefersReducedMotion } from '../lib/flip'
 import { useObservable } from '../lib/useObservable'
 import { DayCell } from './DayCell'
+import { getInkReadingState, subscribeInkReading } from '../lib/inkTranscription'
 
 interface Props {
   currentMonth: Date
@@ -43,7 +44,9 @@ export function MonthGrid({ currentMonth, onMonthChange, weekStartsOn, expandedD
   const inkDates = useObservable(() => liveQuery(() => getInkDatesForRange(rangeStart, rangeEnd)), [rangeStart, rangeEnd], [])
   const categories = useObservable(() => liveQuery(() => db.categories.orderBy('order').toArray()), [], [])
   const categoryById = new Map(categories.map((c) => [c.id, c]))
-  const notesByDate = new Map(dayRows.map((d) => [d.date, d.notes]))
+  const daysByDate = new Map(dayRows.map((d) => [d.date, d]))
+  const [, setInkReadingVersion] = useState(0)
+  useEffect(() => subscribeInkReading(() => setInkReadingVersion(v => v + 1)), [])
 
   useLayoutEffect(() => {
     const el = gridRef.current
@@ -141,7 +144,7 @@ export function MonthGrid({ currentMonth, onMonthChange, weekStartsOn, expandedD
           const dateISO = toISODate(date)
           const isExpanded = expandedDate === dateISO
           const tasks = tasksByDate[dateISO] ?? []
-          const notes = notesByDate.get(dateISO) ?? ''
+          const day = daysByDate.get(dateISO)
 
           return (
             <DayCell
@@ -150,8 +153,10 @@ export function MonthGrid({ currentMonth, onMonthChange, weekStartsOn, expandedD
               isCurrentMonth={isCurrentMonthFn(date, currentMonth)}
               isExpanded={isExpanded}
               tasks={tasks}
-              notes={notes}
+              notes={day?.notes ?? ''}
               hasInk={inkDates.includes(dateISO)}
+              inkText={day?.inkText ?? ''}
+              inkReadingState={getInkReadingState(dateISO)}
               categoryById={categoryById}
               onTap={handleTap}
             />

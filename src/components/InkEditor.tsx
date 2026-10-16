@@ -4,6 +4,7 @@ import type { InkDocument, InkPoint, InkStroke } from '../db/types'
 import { getInk, saveInk } from '../db/repository'
 import { addInkPage, appendStroke, blankInkDocument, clearInkPage, drawInkPage, eraseAt, removeInkPage, INK_HEIGHT, INK_WIDTH } from '../lib/ink'
 import { createId } from '../lib/id'
+import { registerInkFlusher } from '../lib/inkSaveCoordinator'
 
 interface Props { dateISO: string }
 type Tool = 'pen' | 'eraser'
@@ -52,8 +53,10 @@ export default function InkEditor({ dateISO }: Props) {
       },
       error: () => { if (mounted) setStatus('Could not load handwriting. Reopen this day to retry.') }
     })
-    return () => { mounted = false; subscription.unsubscribe(); flush(); if (frameRef.current !== null) cancelAnimationFrame(frameRef.current) }
+    return () => { mounted = false; subscription.unsubscribe(); void flush(); if (frameRef.current !== null) cancelAnimationFrame(frameRef.current) }
   }, [dateISO])
+
+  useEffect(() => registerInkFlusher(dateISO, flush), [dateISO])
 
   function setCurrentPage(index: number) {
     pageIndexRef.current = index
@@ -91,23 +94,24 @@ export default function InkEditor({ dateISO }: Props) {
     return () => observer.disconnect()
   }, [document, pageIndex])
 
-  function flush() {
+  function flush(): Promise<void> {
     if (saveTimerRef.current !== null) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null }
     const snapshot = documentRef.current
-    if (!snapshot || !dirtyRef.current) return
+    if (!snapshot || !dirtyRef.current) return writeQueueRef.current
     writeQueueRef.current = writeQueueRef.current.catch(() => undefined).then(() => saveInk(snapshot))
     writeQueueRef.current.then(() => { if (documentRef.current === snapshot) { dirtyRef.current = false; setStatus('Saved') } }).catch(() => setStatus('Could not save. Keep this page open and try again.'))
+    return writeQueueRef.current
   }
 
   function scheduleSave() {
     dirtyRef.current = true
     setStatus('Saving…')
     if (saveTimerRef.current !== null) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(flush, 400)
+    saveTimerRef.current = setTimeout(() => { void flush() }, 400)
   }
 
   useEffect(() => {
-    const onHide = () => { if (window.document.visibilityState === 'hidden') flush() }
+    const onHide = () => { if (window.document.visibilityState === 'hidden') void flush() }
     window.document.addEventListener('visibilitychange', onHide)
     window.addEventListener('pagehide', flush)
     return () => { window.document.removeEventListener('visibilitychange', onHide); window.removeEventListener('pagehide', flush) }
@@ -288,6 +292,7 @@ export default function InkEditor({ dateISO }: Props) {
         <button class="chip-btn" disabled={!document || (document.pages.length === 1 && !document.pages[0].strokes.length)} onClick={() => { if (document) { updateDocument(removeInkPage(document, pageIndex)); setCurrentPage(Math.max(0, Math.min(pageIndex, document.pages.length - 2))) } }}>Delete page</button>
         <button class="chip-btn" disabled={!document} onClick={saveImage}>Save image</button>
       </footer>
+      <p class="ink-ai-note">When you close this day, Gemini reads the Pencil pages for the calendar preview. Avoid patient details.</p>
     </div>
   )
 }

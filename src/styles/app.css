@@ -224,6 +224,24 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.day-cell-reading {
+  font-size: 11px;
+  line-height: 1.3;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--color-text-tertiary);
+}
+.day-cell-reading span {
+  display: inline-block;
+  background: linear-gradient(100deg, var(--color-text-tertiary) 15%, var(--color-text) 48%, var(--color-text-tertiary) 82%);
+  background-size: 220% 100%;
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: ink-reading-shimmer 1.35s ease-in-out infinite;
+}
+@keyframes ink-reading-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .day-cell-reading span { animation: none; color: var(--color-text-secondary); background: none; } }
 
 .day-cell-footer {
   display: flex;
@@ -374,6 +392,7 @@
 .ink-options { justify-content: space-between; font-size: 12px; color: var(--color-text-secondary); }
 .ink-options label { display: flex; align-items: center; gap: 6px; min-height: 44px; color: var(--color-text); }
 .ink-options input { width: 20px; height: 20px; }
+.ink-ai-note { margin: 0; padding: 4px 12px 8px; font-size: 11px; color: var(--color-text-tertiary); }
 .ink-scroll { flex: 0 0 320px; height: 320px; overflow: auto; padding: 8px; background: var(--color-bg-sunken); }
 .ink-canvas {
   display: block;
@@ -1181,6 +1200,7 @@
 .week-list { gap: 10px; padding: 4px 3px 16px; }
 .week-day-card { border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-bg-elevated); box-shadow: none; padding: 16px 18px; }
 .week-day-card.is-today { box-shadow: inset 0 0 0 1px var(--color-today-ring); }
+.week-day-card-note { margin: 4px 0 8px; color: var(--color-text-secondary); font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .task-row { border: 1px solid var(--color-border); background: var(--color-bg-elevated); border-radius: 8px; min-height: 52px; }
 .task-row-circle { border-color: var(--color-accent); }
 .task-row-title { font-weight: 600; }

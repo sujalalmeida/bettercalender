@@ -13,16 +13,15 @@ npm install
 npm run dev
 ```
 
-Copy `.env.example` to `.env.local` and enter your Firebase web app config. The local `.env.local` is ignored by Git. Vite embeds `VITE_` values in the browser build, so Firebase security must come from Authentication and Firestore rules, not secrecy of the web API key.
+Copy `.env.example` to `.env` or `.env.local` and enter the Firebase web app config and `GEMINI_API_KEY`. Both files are ignored by Git; if both exist, `.env.local` overrides matching values in `.env`. Vite embeds `VITE_` values in the browser build, so Firebase security comes from Authentication and Firestore rules. The unprefixed `GEMINI_API_KEY` is used only by the server-side Cloudflare worker generated at build time.
 
 ## Enable Firebase sync
 
-1. In the Firebase console for the project, enable **Authentication → Sign-in method → Email/Password**.
-2. Create a **Cloud Firestore** database and deploy [firestore.rules](firestore.rules). With the Firebase CLI authenticated, run `firebase deploy --only firestore:rules --project bettecalender`. The rules restrict each user's records to that signed-in account.
-3. Configure the same `VITE_FIREBASE_*` environment values on your hosting provider, then rebuild and deploy. A `.env.local` on the Mac does not configure a remote deployment.
-4. Open **Settings → Cloud sync**, create an account, then sign in with that same account on the iPad. Sign-in alone does not prove the backend is configured; wait for “Saved on this device and synced to Firebase.”
+1. Firebase Authentication Email/Password and the Firestore rules in [firestore.rules](firestore.rules) are enabled in `bettecalender`. If setting up a different project, create a Cloud Firestore database and run `firebase deploy --only auth,firestore:rules --project YOUR_PROJECT_ID`. The rules restrict each user's records to that signed-in account. A static upload does not deploy Firebase configuration or rules.
+2. For a local build and manual Cloudflare upload, use the Firebase variables in `.env` or `.env.local`. For a Git-connected build, configure them in Cloudflare Pages build settings.
+3. Open **Settings → Cloud sync**, create an account, then sign in with that same account on the iPad. Sign-in alone does not prove the backend is configured; wait for “Saved on this device and synced to Firebase.”
 
-Changes are written to Dexie first. Pending cloud changes survive offline use and reloads. The first sign-in merges existing on-device records with cloud records; later changes sync by record, including deletions. A local data set is linked to its first signed-in account to prevent mixing two private calendars on one device. Keep JSON exports as an additional backup, especially for extensive handwriting. Firebase cannot be tested end to end without enabling Authentication, Firestore, and the rules in the Firebase project.
+Changes are written to Dexie first. Pending cloud changes survive offline use and reloads. The first sign-in merges existing on-device records with cloud records; later changes sync by record, including deletions. A local data set is linked to its first signed-in account to prevent mixing two private calendars on one device. Keep JSON exports as an additional backup, especially for extensive handwriting. End-to-end cloud saving still needs an account created in Settings and a signed-in browser.
 
 Open the printed `http://localhost:5173` URL. To test the interface on a phone on the same Wi-Fi, run `npm run dev -- --host 0.0.0.0` and open `http://<your-Mac-LAN-IP>:5173`. iOS requires HTTPS for service workers and Home Screen installation, so use the deployed URL for offline and install tests.
 
@@ -33,7 +32,7 @@ npm run build
 npm run preview
 ```
 
-This serves the production build (with the service worker) at `http://localhost:4173` on the Mac. Localhost is a secure context; a plain HTTP LAN URL is not.
+This serves the production app (with the service worker) at `http://localhost:4173` on the Mac. Gemini requests require the Cloudflare worker, so use `npm run dev` for local Gemini testing. Do not expose Vite's static preview publicly: it may serve the generated worker file containing the Gemini key.
 
 ## Test
 
@@ -50,18 +49,13 @@ Covers recurrence expansion, `.ics` generation, date-range queries (including th
 npm run build
 ```
 
-Type-checks (`tsc -b`) then produces a static `dist/` folder — plain HTML/CSS/JS, deployable anywhere that serves static files.
+Type-checks (`tsc -b`) then produces `dist/`: the web app plus `_worker.js`, a Cloudflare Pages Function that holds the Gemini key and verifies Firebase sign-in before calling Gemini. Keep the `dist/` folder private until uploading it to Cloudflare Pages; it contains the key in server code. Other static hosts can serve the app but cannot run this Gemini Function.
 
 ## Deploy to Cloudflare Pages (free)
 
-1. Push this repo to GitHub.
-2. In the Cloudflare dashboard: **Workers & Pages → Create → Pages → Connect to Git**, pick the repo.
-3. Build settings:
-   - Build command: `npm run build`
-   - Build output directory: `dist`
-4. Deploy. Cloudflare gives you a `https://<project>.pages.dev` URL — that's the link to open on the iPhone.
+For a manual upload, run `npm run build` with `GEMINI_API_KEY` present, then drag the entire `dist/` folder into a **Cloudflare Pages Direct Upload** deployment. Keep `_worker.js` in the uploaded folder. Cloudflare treats it as server-side code. For Git-connected deployment, set the build command to `npm run build`, output to `dist`, and provide `GEMINI_API_KEY` as a Cloudflare build secret or runtime secret. Never commit the key or the generated `dist/` folder.
 
-Netlify also publishes `dist` with the same build command. For a GitHub Pages project URL under `/<repository>/`, set Vite's `base` and the manifest `start_url`/`scope` to that prefix before building; the default configuration targets a site served at `/`.
+This output is intended for Cloudflare Pages. Do not upload the generated `dist/` folder to an ordinary static host, which could serve `_worker.js` as a downloadable file and expose the key.
 
 ## Install on iPhone / iPad
 
@@ -88,6 +82,8 @@ The **Focus** button opens a separate window with a stopwatch and a green garden
 Open a day. The Apple Pencil whiteboard is first and fills most of the opened day; typed Notes are below it. On iPad, the day opens as a large animated card over the month or week. The canvas supports pressure-sensitive ink, color and size choices, stroke erasing, undo/redo, multiple pages, and saving the current page as a PNG. Pencil strokes save automatically in IndexedDB and are included in sync and JSON backups. Fingers scroll the page by default; turn on **Draw with finger** to use a finger or a basic stylus as a pen. A mouse also draws for Mac testing.
 
 The ordinary Notes area, task field, and search field remain standard text controls, so iPadOS Scribble can turn Pencil handwriting there into typed text. The freehand page keeps writing as ink. Browser Pointer Events expose Pencil pressure and tilt on supported iPadOS versions; hardware-specific double-tap and squeeze gestures are not part of this web UI.
+
+After closing a day, Plan transcribes changed Pencil pages with Gemini and shows the recognized text in the Month cell. The cell shows a short moving "Reading handwriting" highlight while it works. Reopening the day retains every original stroke. The transcription is saved with the day, synced and backed up; unchanged pages do not make another AI request. If transcription fails, the cell offers a retry when the day is reopened and closed. Transcription needs an internet connection and the Gemini setup below, and the handwritten page images are sent to Google for processing. Avoid patient details and private diary content on the whiteboard.
 
 ## Project layout
 
@@ -130,12 +126,8 @@ The top tabs open separate Revision, Skills and Milestones workspaces. Each can 
 
 ### Optional Gemini suggestions
 
-Gemini can extract suggested fields from a typed or dictated note, an image/PDF schedule or syllabus, or an audio recording. Every suggestion appears in an editable review card and saves only when tapped. Audio and uploaded files are sent to Gemini on Analyze; they are not stored in the app. Keep patient details and sensitive personal notes out of AI input.
+Gemini can create separate review, skill or milestone cards from a full typed or keyboard-dictated request, an image/PDF schedule or syllabus, or an audio recording. Every suggestion appears in an editable review card; save cards individually or all at once. Audio and uploaded files are sent to Gemini on Analyze; they are not stored in the app. Keep patient details and sensitive personal notes out of AI input.
 
-This uses **Firebase AI Logic**, so the separate Gemini API key is not placed in the client app or needed for this integration. To activate it:
+This uses the `GEMINI_API_KEY` in the local build environment or the Cloudflare runtime. No Firebase App Check site key is needed. Gemini requests go through the Cloudflare worker, which verifies the user's Firebase sign-in before calling Google. The same path powers handwriting transcription. Set `VITE_GEMINI_MODEL` to a Gemini model enabled for the key; the default is `gemini-3.8-flash`.
 
-1. In the Firebase console, set up Firebase AI Logic with the Gemini Developer API for this project.
-2. Register the web app with App Check using reCAPTCHA Enterprise and add its site key to `.env.local` as `VITE_FIREBASE_APPCHECK_SITE_KEY`. Enable enforcement for Firebase AI Logic in the console after verifying requests. Keep the site key restricted to your deployed domain; add a development domain or debug token for local testing.
-3. Restart the Vite server or redeploy after changing `.env.local`. Optionally set `VITE_GEMINI_MODEL` to a model enabled for your project. The default is `gemini-2.5-flash`.
-
-Manual entry works without Gemini. Firestore cloud sync requires Firebase Authentication Email/Password to be enabled separately; the Firebase web config in `.env.local` alone does not activate sign-in or sync. In Settings → Cloud sync, a successful account sign-in and “Saved on this device and synced to Firebase” confirms cloud sync. Gemini suggestions do not require a signed-in account, but App Check must be configured. Avoid the Gemini Developer API free tier for sensitive content because its data-use terms differ from paid usage.
+Firestore cloud sync still requires Firebase Authentication Email/Password and the rules above. In Settings → Cloud sync, sign in and wait for “Saved on this device and synced to Firebase.” Gemini also requires this sign-in. Manual entry works offline without Gemini. Avoid patient-identifying or private diary content in AI input.

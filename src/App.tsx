@@ -14,6 +14,7 @@ import { applyThemeClass, useSettings } from './lib/settingsStore'
 import { setAppBadgeCount } from './lib/appBadge'
 import { useLazyComponent } from './lib/useLazyComponent'
 import { useObservable } from './lib/useObservable'
+import { transcribeDayAfterClose } from './lib/inkTranscription'
 
 type View = 'today' | 'month' | 'week' | 'revision' | 'skills' | 'milestones'
 
@@ -94,12 +95,14 @@ export function App({ initialStorageNotice }: { initialStorageNotice: string | n
   }
 
   function handleCollapse() {
+    if (expandedDate) void transcribeDayAfterClose(expandedDate)
     setExpandedDate(null)
     setExpandOrigin(null)
   }
 
   function handleNavigateDay(delta: 1 | -1) {
     if (!expandedDate) return
+    void transcribeDayAfterClose(expandedDate)
     const next = addDaysToDate(fromISODate(expandedDate), delta)
     setExpandedDate(toISODate(next))
     if (!isCurrentMonth(next, currentMonth)) setCurrentMonth(next)

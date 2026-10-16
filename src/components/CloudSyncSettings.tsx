@@ -14,13 +14,14 @@ export default function CloudSyncSettings() {
     setMessage('')
     try { await action() } catch (error) {
       const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : ''
-      setMessage(code === 'auth/invalid-credential' ? 'Email or password is incorrect.' : code === 'auth/email-already-in-use' ? 'This email already has an account. Sign in instead.' : code === 'auth/weak-password' ? 'Use a longer password.' : error instanceof Error ? error.message : 'Something went wrong.')
+      setMessage(code === 'auth/invalid-credential' ? 'Email or password is incorrect.' : code === 'auth/operation-not-allowed' ? 'Enable Email/Password under Firebase Authentication → Sign-in method.' : code === 'auth/email-already-in-use' ? 'This email already has an account. Sign in instead.' : code === 'auth/weak-password' ? 'Use a longer password.' : error instanceof Error ? error.message : 'Something went wrong.')
     } finally { setBusy(false) }
   }
 
   return <section class="settings-section cloud-sync-section">
     <h3>Cloud sync</h3>
     <p class="settings-hint">Changes save instantly on this device. Sign in with the same account on her iPad to sync notes, handwriting, tasks, categories, and templates through Firebase.</p>
+    {cloud.configured && <p class="settings-hint">Firebase project: {import.meta.env.VITE_FIREBASE_PROJECT_ID}</p>}
     <p class="settings-hint" role="status">{cloud.status}</p>
     {!cloud.configured ? <p class="settings-hint">Add Firebase web config to .env.local before running the app.</p> : cloud.email ? <div class="settings-row-buttons">
       <span class="cloud-email">{cloud.email}</span>

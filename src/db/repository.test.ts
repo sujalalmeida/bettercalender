@@ -14,6 +14,7 @@ import {
   getSetting,
   reorderTasks,
   saveInk,
+  saveDayNotes,
   getInk,
   getInkDatesForRange
 } from './repository'
@@ -151,5 +152,11 @@ describe('getTasksForRange', () => {
     await db.ink.clear()
     await importAll(bundle, 'merge')
     expect((await getInk('2026-01-02'))?.pages[0].strokes[0].points[0].x).toBe(10)
+  })
+
+  it('keeps the handwriting transcription when typed notes are edited', async () => {
+    await db.days.put({ date: '2026-01-02', notes: '', inkText: 'Review surgery', inkTextSourceUpdatedAt: 10, updatedAt: 11 })
+    await saveDayNotes('2026-01-02', 'Bring lecture slides')
+    expect(await db.days.get('2026-01-02')).toMatchObject({ notes: 'Bring lecture slides', inkText: 'Review surgery', inkTextSourceUpdatedAt: 10 })
   })
 })

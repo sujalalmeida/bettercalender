@@ -45,16 +45,18 @@ export function removeInkPage(document: InkDocument, pageIndex: number): InkDocu
   return { ...document, pages: document.pages.filter((_, i) => i !== pageIndex) }
 }
 
-export function drawInkPage(ctx: CanvasRenderingContext2D, page: InkPage, active?: InkStroke | null): void {
+export function drawInkPage(ctx: CanvasRenderingContext2D, page: InkPage, active?: InkStroke | null, showGuides = true): void {
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, INK_WIDTH, INK_HEIGHT)
-  ctx.strokeStyle = '#e8eef5'
-  ctx.lineWidth = 1
-  for (let y = 96; y < INK_HEIGHT - 30; y += 48) {
-    ctx.beginPath()
-    ctx.moveTo(48, y)
-    ctx.lineTo(INK_WIDTH - 48, y)
-    ctx.stroke()
+  if (showGuides) {
+    ctx.strokeStyle = '#e8eef5'
+    ctx.lineWidth = 1
+    for (let y = 96; y < INK_HEIGHT - 30; y += 48) {
+      ctx.beginPath()
+      ctx.moveTo(48, y)
+      ctx.lineTo(INK_WIDTH - 48, y)
+      ctx.stroke()
+    }
   }
   for (const stroke of page.strokes) drawStroke(ctx, stroke)
   if (active) drawStroke(ctx, active)

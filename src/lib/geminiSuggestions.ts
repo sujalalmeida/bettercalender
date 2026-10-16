@@ -1,8 +1,8 @@
 import { getApps, initializeApp } from 'firebase/app'
-import { getAI, getGenerativeModel, GoogleAIBackend } from 'firebase/ai'
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check'
+import { getAuth } from 'firebase/auth'
 import type { MilestoneInput, RevisionInput, SkillInput } from '../db/learningRepository'
 import { nextReviewDate } from '../db/learningRepository'
+import { todayISO } from './dates'
 
 type Target = 'revision' | 'skills' | 'milestones'
 export type Suggestion = RevisionInput | SkillInput | MilestoneInput
@@ -24,19 +24,40 @@ export function parseSuggestions(raw: string, target: Target): Suggestion[] {
 }
 
 export type AIFile = { mimeType: string; data: string }
-let appCheckReady = false
-export async function generateSuggestions(target: Target, note: string, file?: AIFile): Promise<Suggestion[]> {
+async function generateJson(prompt: string, images: AIFile[] = []): Promise<string> {
   const config = { apiKey: import.meta.env.VITE_FIREBASE_API_KEY, authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID, appId: import.meta.env.VITE_FIREBASE_APP_ID }
-  if (!config.apiKey || !config.projectId || !config.appId) throw new Error('Firebase configuration is missing.')
-  const siteKey = import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY
-  if (!siteKey) throw new Error('Gemini needs Firebase App Check setup. Add VITE_FIREBASE_APPCHECK_SITE_KEY after enabling App Check in Firebase.')
+  if (!config.apiKey || !config.projectId || !config.appId) throw new Error('Gemini is not connected yet. Ask the app owner to finish setup.')
   const app = getApps()[0] ?? initializeApp(config)
-  if (!appCheckReady) { initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(siteKey), isTokenAutoRefreshEnabled: true }); appCheckReady = true }
-  const ai = getAI(app, { backend: new GoogleAIBackend() })
-  const model = getGenerativeModel(ai, { model: import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash', generationConfig: { responseMimeType: 'application/json', temperature: 0.1 } })
+  const user = getAuth(app).currentUser
+  if (!user) throw new Error('Sign in under Settings → Cloud sync before using Gemini.')
+  const response = await fetch('/api/gemini', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+    body: JSON.stringify({ parts: [{ text: prompt }, ...images.map(image => ({ inlineData: image }))] })
+  })
+  const result = await response.json() as { text?: string; error?: string }
+  if (!response.ok || !result.text) throw new Error(result.error || 'Gemini could not analyze this. Please try again.')
+  return result.text
+}
+
+export async function generateSuggestions(target: Target, note: string, file?: AIFile): Promise<Suggestion[]> {
   const fields = target === 'revision' ? 'title, subject, reason, takeaway, source, confidence (1-3), nextReviewDate (YYYY-MM-DD)' : target === 'skills' ? 'kind (learning or practice), title, note, rotation, nextStep, confidence (1-3)' : 'kind (exam, application, elective, reference, form, other), title, dueDate (YYYY-MM-DD), notes, url, steps (array of short strings)'
-  const prompt = `Extract ${target} entries from the user's text or uploaded academic schedule/syllabus. Return ONLY valid JSON: {"items":[{${fields}}]}. Use at most 20 items. Keep exact dates only if explicit; do not invent deadlines, patient details, or achievements. Omit uncertain values by using empty strings. For revision topics, create a review entry only for an explicitly weak or missed topic. For skills, capture only learning or practice the user explicitly mentions. For milestones, extract only concrete commitments or deadlines, not every syllabus heading. The user may speak informally. User text: ${note.slice(0,10000)}`
-  const parts = file ? [prompt, { inlineData: file }] : [prompt]
-  const result = await model.generateContent(parts)
-  return parseSuggestions(result.response.text(), target)
+  const prompt = `Today is ${todayISO()}. The user is a final-year medical student. Create editable ${target} cards from her request or uploaded academic schedule/syllabus. Return ONLY valid JSON: {"items":[{${fields}}]}. Use one card per distinct topic, skill or milestone, up to 20 cards. Preserve all explicitly stated topics, sources, lecture slides, dates, rotations, follow-ups and checklist details. Interpret relative dates against today only when unambiguous. Never invent a deadline, source, patient detail or completed achievement. Use an empty string for missing details. For revision: a topic she asks to review is enough; reason can describe why she wants to review it, and takeaway should only state a fact she supplied (never fabricate medical advice). For skills: only record learning or practice she mentions or asks to track; use nextStep for planned follow-up. For milestones: create concrete exams, applications, electives, references, forms or follow-ups, and make short steps only when supported by her request. The user may speak informally. User text: ${note.slice(0,12000)}`
+  return parseSuggestions(await generateJson(prompt, file ? [file] : []), target)
+}
+
+/** Reads handwriting only; the original vector ink stays in IndexedDB. */
+export async function transcribeInk(images: AIFile[]): Promise<string> {
+  if (!images.length) return ''
+  const parts: string[] = []
+  for (let start = 0; start < images.length; start += 4) {
+    const result = await generateJson(
+      'Transcribe every legible handwritten word in these page images in reading order. Preserve line breaks where useful. Return ONLY valid JSON like {"text":"..."}. Do not summarize, correct medical facts, invent missing words, or add commentary. If a word is unreadable, use [unclear].',
+      images.slice(start, start + 4)
+    )
+    const parsed: unknown = JSON.parse(result)
+    if (!parsed || typeof parsed !== 'object' || !('text' in parsed) || typeof parsed.text !== 'string') throw new Error('Gemini returned an unreadable transcription.')
+    parts.push(parsed.text.trim())
+  }
+  return parts.filter(Boolean).join('\n\n').slice(0, 20000)
 }

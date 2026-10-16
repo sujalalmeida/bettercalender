@@ -19,7 +19,8 @@ function isObject(v: unknown): v is Record<string, unknown> {
 }
 
 function isDay(v: unknown): boolean {
-  return isObject(v) && isDate(v.date) && isString(v.notes) && isNumber(v.updatedAt)
+  return isObject(v) && isDate(v.date) && isString(v.notes) && isNumber(v.updatedAt) &&
+    optional(v.inkText, isString) && optional(v.inkTextSourceUpdatedAt, isNumber)
 }
 
 function isTask(v: unknown): boolean {
