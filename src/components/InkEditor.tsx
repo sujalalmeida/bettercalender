@@ -292,7 +292,6 @@ export default function InkEditor({ dateISO }: Props) {
         <button class="chip-btn" disabled={!document || (document.pages.length === 1 && !document.pages[0].strokes.length)} onClick={() => { if (document) { updateDocument(removeInkPage(document, pageIndex)); setCurrentPage(Math.max(0, Math.min(pageIndex, document.pages.length - 2))) } }}>Delete page</button>
         <button class="chip-btn" disabled={!document} onClick={saveImage}>Save image</button>
       </footer>
-      <p class="ink-ai-note">When you close this day, Gemini reads the Pencil pages for the calendar preview. Avoid patient details.</p>
     </div>
   )
 }

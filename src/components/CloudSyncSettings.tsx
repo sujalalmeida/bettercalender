@@ -20,8 +20,6 @@ export default function CloudSyncSettings() {
 
   return <section class="settings-section cloud-sync-section">
     <h3>Cloud sync</h3>
-    <p class="settings-hint">Changes save instantly on this device. Sign in with the same account on her iPad to sync notes, handwriting, tasks, categories, and templates through Firebase.</p>
-    {cloud.configured && <p class="settings-hint">Firebase project: {import.meta.env.VITE_FIREBASE_PROJECT_ID}</p>}
     <p class="settings-hint" role="status">{cloud.status}</p>
     {!cloud.configured ? <p class="settings-hint">Add Firebase web config to .env.local before running the app.</p> : cloud.email ? <div class="settings-row-buttons">
       <span class="cloud-email">{cloud.email}</span>

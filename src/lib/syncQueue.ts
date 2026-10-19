@@ -43,8 +43,8 @@ export function installSyncTracking(): void {
   }
 }
 
-export async function applyRemoteChange(table: Table, action: () => Promise<void>): Promise<void> {
-  await db.transaction('rw', table, async () => {
+export async function applyRemoteChange(table: Table, action: () => Promise<void>, additionalTables: Table[] = []): Promise<void> {
+  await db.transaction('rw', [table, ...additionalTables], async () => {
     const tx = Dexie.currentTransaction as RemoteTransaction | null
     if (tx) tx.cloudRemote = true
     await action()

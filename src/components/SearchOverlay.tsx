@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'preact/hooks'
+import { useMemo, useState } from 'preact/hooks'
+import { liveQuery } from 'dexie'
 import { buildSearchIndex, searchIndex, type SearchResult } from '../db/repository'
 import { fromISODate, formatDayTitle } from '../lib/dates'
 import { useEscapeKey } from '../lib/useEscapeKey'
+import { useObservable } from '../lib/useObservable'
 
 interface Props {
   onClose: () => void
@@ -10,20 +12,12 @@ interface Props {
 
 export default function SearchOverlay({ onClose, onJumpToDate }: Props) {
   const [query, setQuery] = useState('')
-  const [index, setIndex] = useState<SearchResult[]>([])
-  const [loading, setLoading] = useState(true)
+  const index = useObservable(() => liveQuery(buildSearchIndex), [], null as SearchResult[] | null)
+  const loading = index === null
 
   useEscapeKey(onClose)
 
-  useEffect(() => {
-    let active = true
-    const start = () => { buildSearchIndex().then(rows => { if (active) { setIndex(rows); setLoading(false) } }).catch(() => { if (active) setLoading(false) }) }
-    const idle = window.requestIdleCallback?.(start)
-    const timer = idle === undefined ? setTimeout(start, 0) : undefined
-    return () => { active = false; if (idle !== undefined) window.cancelIdleCallback(idle); if (timer !== undefined) clearTimeout(timer) }
-  }, [])
-
-  const results = useMemo(() => searchIndex(index, query), [index, query])
+  const results = useMemo(() => searchIndex(index ?? [], query), [index, query])
 
   const grouped = new Map<string, SearchResult[]>()
   for (const r of results) {

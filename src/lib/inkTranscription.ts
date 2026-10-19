@@ -38,7 +38,7 @@ export function transcribeDayAfterClose(dateISO: string): Promise<void> {
       await flushInkForDate(dateISO)
       const ink = await db.ink.get(dateISO)
       const day = await db.days.get(dateISO)
-      if (!ink) return
+      if (!ink) { setState(dateISO, undefined); return }
       const pages = ink.pages.filter(page => page.strokes.length > 0)
       if (!pages.length) {
         if (day?.inkText) await db.transaction('rw', db.days, async () => {
@@ -54,9 +54,9 @@ export function transcribeDayAfterClose(dateISO: string): Promise<void> {
       const { transcribeInk } = await import('./geminiSuggestions')
       const inkText = await transcribeInk(images)
       // Never let a delayed response replace text from newer Pencil strokes.
-      const latestInk = await db.ink.get(dateISO)
-      if (latestInk?.updatedAt !== ink.updatedAt) return
-      await db.transaction('rw', db.days, async () => {
+      await db.transaction('rw', db.days, db.ink, async () => {
+        const latestInk = await db.ink.get(dateISO)
+        if (latestInk?.updatedAt !== ink.updatedAt) { rerun.add(dateISO); return }
         const currentDay = await db.days.get(dateISO)
         await db.days.put({ ...currentDay, date: dateISO, notes: currentDay?.notes ?? '', inkText, inkTextSourceUpdatedAt: ink.updatedAt, updatedAt: Date.now() })
       })

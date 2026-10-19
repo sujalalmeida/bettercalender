@@ -51,6 +51,7 @@ export function WeekView({ anchorDate, onAnchorChange, weekStartsOn, onExpand }:
           const tasks = tasksByDate[dateISO] ?? []
           const doneCount = tasks.filter((t) => t.done).length
           const inkText = daysByDate.get(dateISO)?.inkText?.trim() ?? ''
+          const notes = daysByDate.get(dateISO)?.notes?.trim() ?? ''
           const reading = getInkReadingState(dateISO) === 'reading'
 
           return (
@@ -69,16 +70,18 @@ export function WeekView({ anchorDate, onAnchorChange, weekStartsOn, onExpand }:
                   </span>
                 )}
               </div>
-              {reading ? <div class="week-day-card-note day-cell-reading" aria-label="Reading handwriting"><span>Reading handwriting</span></div> : (inkText || inkDates.includes(dateISO)) && <div class="week-day-card-note">{inkText ? inkText.replace(/\s+/g, ' ') : 'Open to convert note'}</div>}
+              {reading && <div class="week-day-card-note day-cell-reading" aria-label="Reading handwriting"><span>Reading handwriting</span></div>}
+              {(inkText || inkDates.includes(dateISO) && !reading) && <div class="week-day-card-note">{inkText || 'Open to convert note'}</div>}
+              {notes && <div class="week-day-card-note">{notes}</div>}
               <ul class="week-day-card-tasks">
-                {tasks.slice(0, 5).map((t) => (
+                {tasks.map((t) => (
                   <li key={t.id} class={t.done ? 'is-done' : ''}>
                     {t.categoryId && categoryById.get(t.categoryId) && <CategoryDot color={categoryById.get(t.categoryId)!.color} />}
                     <span>{t.title}</span>
                     {t.time && <span class="task-row-time">{t.time}</span>}
                   </li>
                 ))}
-                {tasks.length === 0 && <li class="week-day-card-empty">Nothing planned</li>}
+                {tasks.length === 0 && !notes && !inkText && !inkDates.includes(dateISO) && <li class="week-day-card-empty">No entries</li>}
               </ul>
             </button>
           )

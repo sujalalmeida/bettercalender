@@ -16,7 +16,9 @@ import {
   saveInk,
   saveDayNotes,
   getInk,
-  getInkDatesForRange
+  getInkDatesForRange,
+  buildSearchIndex,
+  searchIndex
 } from './repository'
 
 beforeEach(async () => {
@@ -42,6 +44,38 @@ afterEach(async () => {
 })
 
 describe('getTasksForRange', () => {
+  it('shows a Today task and completion in day, week and month ranges', async () => {
+    await addTask('2026-10-19', 'Review surgery', { time: '15:00' })
+    const day = await getTasksForRange('2026-10-19', '2026-10-19')
+    const task = day['2026-10-19'][0]
+    expect((await getTasksForRange('2026-10-18', '2026-10-24'))['2026-10-19']).toEqual([task])
+    await toggleTaskDone(task)
+    expect((await getTasksForRange('2026-10-01', '2026-10-31'))['2026-10-19'][0].done).toBe(true)
+  })
+
+  it('toggles against the latest saved task rather than a stale view', async () => {
+    await addTask('2026-10-19', 'Review surgery')
+    const task = (await getTasksForRange('2026-10-19', '2026-10-19'))['2026-10-19'][0]
+    await Promise.all([toggleTaskDone(task), toggleTaskDone(task)])
+    expect((await db.tasks.get(task.id))?.done).toBe(false)
+  })
+
+  it('uses the same occurrence ID when another device materializes a repeating task', async () => {
+    await addRecurrence({ title: 'Review', startDate: '2026-10-19', rule: { frequency: 'daily' } })
+    const virtual = (await getTasksForRange('2026-10-20', '2026-10-20'))['2026-10-20'][0]
+    await toggleTaskDone(virtual)
+    const first = await db.tasks.toArray()
+    await db.tasks.clear()
+    await toggleTaskDone(virtual)
+    expect((await db.tasks.toArray())[0].id).toBe(first[0].id)
+  })
+
+  it('searches handwritten text and words after the first 120 characters', async () => {
+    await db.days.put({ date: '2026-10-19', notes: `${'A long note. '.repeat(20)}surgery review`, inkText: 'cardiology revision', updatedAt: 1 })
+    const index = await buildSearchIndex()
+    expect(searchIndex(index, 'cardiology')[0].date).toBe('2026-10-19')
+    expect(searchIndex(index, 'surgery')[0].snippet).toContain('surgery')
+  })
   it('returns one-off tasks within the date range', async () => {
     await addTask('2026-01-02', 'Buy groceries')
     await addTask('2026-01-10', 'Outside range')

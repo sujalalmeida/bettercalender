@@ -25,14 +25,10 @@ export function DayCell({ date, isCurrentMonth, isExpanded, tasks, notes, hasInk
   const categoryColors = [...new Set(tasks.map((t) => t.categoryId).filter(Boolean))].slice(0, 4) as string[]
 
   const previewLines: string[] = []
-  if (hasInk && inkText.trim() && inkReadingState !== 'reading') previewLines.push(inkText.trim().replace(/\s+/g, ' '))
+  if (hasInk && inkText.trim()) previewLines.push(inkText.trim())
   if (hasInk && !inkText.trim() && inkReadingState === 'error') previewLines.push('Text unavailable · reopen to retry')
   if (hasInk && !inkText.trim() && !inkReadingState) previewLines.push('Open to convert note')
   if (notes.trim()) previewLines.push(notes.trim())
-  for (const t of tasks) {
-    if (previewLines.length >= 2) break
-    previewLines.push(t.title)
-  }
 
   const label = `${date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}${
     tasks.length ? `, ${tasks.length} task${tasks.length === 1 ? '' : 's'}` : ''
@@ -60,6 +56,10 @@ export function DayCell({ date, isCurrentMonth, isExpanded, tasks, notes, hasInk
             {line}
           </div>
         ))}
+        {tasks.map(task => <div class={`day-cell-task ${task.done ? 'is-done' : ''}`} key={task.id}>
+          <span aria-hidden="true">{task.done ? '✓' : '·'}</span>
+          <span>{task.time && <span class="day-cell-task-time">{task.time} </span>}{task.title}</span>
+        </div>)}
       </div>
 
       <div class="day-cell-footer">

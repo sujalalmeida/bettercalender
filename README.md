@@ -13,15 +13,15 @@ npm install
 npm run dev
 ```
 
-Copy `.env.example` to `.env` or `.env.local` and enter the Firebase web app config and `GEMINI_API_KEY`. Both files are ignored by Git; if both exist, `.env.local` overrides matching values in `.env`. Vite embeds `VITE_` values in the browser build, so Firebase security comes from Authentication and Firestore rules. The unprefixed `GEMINI_API_KEY` is used only by the server-side Cloudflare worker generated at build time.
+Copy `.env.example` to `.env` or `.env.local` and enter the Firebase web app config and `GEMINI_API_KEY`. Both files are ignored by Git; if both exist, `.env.local` overrides matching values in `.env`. Vite embeds `VITE_` values in the browser build, so Firebase security comes from Authentication and Firestore rules. The unprefixed `GEMINI_API_KEY` is used only by the local development server; deployed Gemini uses a private Cloudflare Worker secret.
 
 ## Enable Firebase sync
 
 1. Firebase Authentication Email/Password and the Firestore rules in [firestore.rules](firestore.rules) are enabled in `bettecalender`. If setting up a different project, create a Cloud Firestore database and run `firebase deploy --only auth,firestore:rules --project YOUR_PROJECT_ID`. The rules restrict each user's records to that signed-in account. A static upload does not deploy Firebase configuration or rules.
-2. For a local build and manual Cloudflare upload, use the Firebase variables in `.env` or `.env.local`. For a Git-connected build, configure them in Cloudflare Pages build settings.
-3. Open **Settings → Cloud sync**, create an account, then sign in with that same account on the iPad. Sign-in alone does not prove the backend is configured; wait for “Saved on this device and synced to Firebase.”
+2. For a local build, use the Firebase variables in `.env` or `.env.local`. For a Git-connected build, configure them in Cloudflare's build settings.
+3. Open **Settings → Cloud sync**, create an account, then sign in with that same account on the iPad. Sign-in alone does not prove the backend is configured; wait for “Synced”
 
-Changes are written to Dexie first. Pending cloud changes survive offline use and reloads. The first sign-in merges existing on-device records with cloud records; later changes sync by record, including deletions. A local data set is linked to its first signed-in account to prevent mixing two private calendars on one device. Keep JSON exports as an additional backup, especially for extensive handwriting. End-to-end cloud saving still needs an account created in Settings and a signed-in browser.
+Changes are written to Dexie first. Pending cloud changes survive offline use and reloads. Failed uploads retry automatically; returning online or reopening the app resumes sync. Tasks are uploaded ahead of large whiteboards, and one failed record does not stop the rest of the queue. The first sign-in merges existing on-device records with cloud records; later changes sync by record, including deletions. A local data set is linked to its first signed-in account to prevent mixing two private calendars on one device. Keep JSON exports as an additional backup, especially for extensive handwriting. End-to-end cloud saving still needs an account created in Settings and a signed-in browser.
 
 Open the printed `http://localhost:5173` URL. To test the interface on a phone on the same Wi-Fi, run `npm run dev -- --host 0.0.0.0` and open `http://<your-Mac-LAN-IP>:5173`. iOS requires HTTPS for service workers and Home Screen installation, so use the deployed URL for offline and install tests.
 
@@ -32,7 +32,7 @@ npm run build
 npm run preview
 ```
 
-This serves the production app (with the service worker) at `http://localhost:4173` on the Mac. Gemini requests require the Cloudflare worker, so use `npm run dev` for local Gemini testing. Do not expose Vite's static preview publicly: it may serve the generated worker file containing the Gemini key.
+This serves the production app (with the service worker) at `http://localhost:4173` on the Mac. Gemini requests require the Cloudflare worker, so use `npm run dev` for local Gemini testing.
 
 ## Test
 
@@ -49,13 +49,19 @@ Covers recurrence expansion, `.ics` generation, date-range queries (including th
 npm run build
 ```
 
-Type-checks (`tsc -b`) then produces `dist/`: the web app plus `_worker.js`, a Cloudflare Pages Function that holds the Gemini key and verifies Firebase sign-in before calling Gemini. Keep the `dist/` folder private until uploading it to Cloudflare Pages; it contains the key in server code. Other static hosts can serve the app but cannot run this Gemini Function.
+Type-checks (`tsc -b`) then produces `dist/`: the web app plus `_worker.js`, a Cloudflare Worker that reads the private Gemini runtime secret and verifies Firebase sign-in before calling Gemini. The generated `.assetsignore` prevents Wrangler from publishing `_worker.js` as a static asset.
 
-## Deploy to Cloudflare Pages (free)
+## Deploy to the existing Cloudflare Worker
 
-For a manual upload, run `npm run build` with `GEMINI_API_KEY` present, then drag the entire `dist/` folder into a **Cloudflare Pages Direct Upload** deployment. Keep `_worker.js` in the uploaded folder. Cloudflare treats it as server-side code. For Git-connected deployment, set the build command to `npm run build`, output to `dist`, and provide `GEMINI_API_KEY` as a Cloudflare build secret or runtime secret. Never commit the key or the generated `dist/` folder.
+The current site, `bettercalender.sujalalmeida13.workers.dev`, is a **Cloudflare Worker**, not a Pages site. Dragging `dist/` into its static-assets uploader updates the interface but does not install the `/api/gemini` code. From this project, with Wrangler signed in and `.env` filled in, run:
 
-This output is intended for Cloudflare Pages. Do not upload the generated `dist/` folder to an ordinary static host, which could serve `_worker.js` as a downloadable file and expose the key.
+```bash
+npm run deploy:worker
+```
+
+This builds the app and deploys both its assets and server code to the existing `bettercalender` Worker. The `wrangler.jsonc` configuration routes `/api/*` to the Worker, while ordinary assets stay fast. Add or replace the server-side key with `npx wrangler secret put GEMINI_API_KEY --name bettercalender`; Wrangler prompts for its value. Never commit the key or generated `dist/` folder.
+
+Alternatively, a **separate Cloudflare Pages** project can accept a complete `dist/` Direct Upload, including `_worker.js`, as a Pages Function, but its `GEMINI_API_KEY` must be set as a Pages runtime secret. That produces a different Pages URL. Do not upload `dist/` to an ordinary static host, which could serve `_worker.js` as a downloadable file.
 
 ## Install on iPhone / iPad
 
@@ -71,7 +77,7 @@ Settings → **Export JSON** downloads everything (typed notes, handwritten page
 
 ## Daily timeline and refreshed design
 
-The Today tab opens a daily timeline with a seven-day date strip, anytime and scheduled tasks, progress, quick task entry, and a direct link to the day's checklist and Apple Pencil whiteboard. Month, Week, Revision, Skills, Milestones, search, settings, backups and sync remain available. The interface uses a monochrome editorial style with no gradients. The timeline reads and writes the same task records as Month and Week.
+The Today tab opens a daily timeline with a seven-day date strip, anytime and scheduled tasks, progress, quick task entry, and a direct link to the day's checklist and Apple Pencil whiteboard. Month, Week, Revision, Skills, Milestones, search, settings, backups and sync remain available. The interface uses a monochrome editorial style with no gradients. The timeline reads and writes the same task records as Month and Week. Month cells grow to fit wrapped notes and tasks, with a taller minimum height. On narrow screens the month grid scrolls horizontally rather than squeezing its columns. Week shows typed notes, recognized handwriting and the full task list. Search covers complete notes and handwriting and updates when synced content changes.
 
 ## Focus Garden
 
@@ -128,6 +134,6 @@ The top tabs open separate Revision, Skills and Milestones workspaces. Each can 
 
 Gemini can create separate review, skill or milestone cards from a full typed or keyboard-dictated request, an image/PDF schedule or syllabus, or an audio recording. Every suggestion appears in an editable review card; save cards individually or all at once. Audio and uploaded files are sent to Gemini on Analyze; they are not stored in the app. Keep patient details and sensitive personal notes out of AI input.
 
-This uses the `GEMINI_API_KEY` in the local build environment or the Cloudflare runtime. No Firebase App Check site key is needed. Gemini requests go through the Cloudflare worker, which verifies the user's Firebase sign-in before calling Google. The same path powers handwriting transcription. Set `VITE_GEMINI_MODEL` to a Gemini model enabled for the key; the default is `gemini-3.8-flash`.
+This uses the `GEMINI_API_KEY` from `.env` for local development and a private Cloudflare runtime secret when deployed. No Firebase App Check site key is needed. Gemini requests go through the Cloudflare worker, which verifies the user's Firebase sign-in before calling Google. The same path powers handwriting transcription. Set `VITE_GEMINI_MODEL` to a Gemini model enabled for the key; the default is `gemini-3.8-flash`.
 
-Firestore cloud sync still requires Firebase Authentication Email/Password and the rules above. In Settings → Cloud sync, sign in and wait for “Saved on this device and synced to Firebase.” Gemini also requires this sign-in. Manual entry works offline without Gemini. Avoid patient-identifying or private diary content in AI input.
+Firestore cloud sync still requires Firebase Authentication Email/Password and the rules above. In Settings → Cloud sync, sign in and wait for “Synced” Gemini also requires this sign-in. Manual entry works offline without Gemini. Avoid patient-identifying or private diary content in AI input.

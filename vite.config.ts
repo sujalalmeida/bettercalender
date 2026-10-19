@@ -2,6 +2,7 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
 import preact from '@preact/preset-vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { build as buildWorker } from 'esbuild'
+import { writeFile } from 'node:fs/promises'
 import { handleGeminiRequest } from './server/geminiWorker'
 
 export default defineConfig(({ mode }) => {
@@ -32,11 +33,12 @@ export default defineConfig(({ mode }) => {
         entryPoints: ['server/geminiWorker.ts'], outfile: `${outputDir}/_worker.js`,
         bundle: true, format: 'esm', platform: 'browser', target: 'es2022', minify: true,
         define: {
-          __EMBEDDED_GEMINI_KEY__: JSON.stringify(values.GEMINI_API_KEY || ''),
           __FIREBASE_WEB_API_KEY__: JSON.stringify(values.VITE_FIREBASE_API_KEY || ''),
           __GEMINI_MODEL__: JSON.stringify(values.VITE_GEMINI_MODEL || 'gemini-3.8-flash')
         }
       })
+      // Workers Static Assets must never publish the server code as a public file.
+      await writeFile(`${outputDir}/.assetsignore`, '_worker.js\n')
     }
   }
   return {

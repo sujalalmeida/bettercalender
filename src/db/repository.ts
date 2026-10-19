@@ -48,7 +48,7 @@ async function materializeOccurrence(rec: Recurrence, dateISO: string): Promise<
 
   const siblingCount = await db.tasks.where('date').equals(dateISO).count()
   const task: Task = {
-    id: createId(),
+    id: `occurrence:${rec.id}:${dateISO}`,
     date: dateISO,
     title: rec.title,
     done: false,
@@ -131,8 +131,9 @@ export async function addTask(
 
 async function resolveToRealTask(task: TaskViewModel): Promise<Task> {
   if (!task.virtual) {
-    const { virtual: _virtual, ...rest } = task
-    return rest
+    const current = await db.tasks.get(task.id)
+    if (!current) throw new Error('This task was deleted. Reopen the day to refresh it.')
+    return current
   }
   const rec = await db.recurrences.get(task.recurrenceId!)
   if (!rec) throw new Error('Recurrence not found for virtual task')
@@ -140,8 +141,10 @@ async function resolveToRealTask(task: TaskViewModel): Promise<Task> {
 }
 
 export async function toggleTaskDone(task: TaskViewModel): Promise<void> {
-  const real = await resolveToRealTask(task)
-  await db.tasks.update(real.id, { done: !real.done, updatedAt: Date.now() })
+  await db.transaction('rw', db.tasks, db.recurrences, async () => {
+    const real = await resolveToRealTask(task)
+    await db.tasks.update(real.id, { done: !real.done, updatedAt: Date.now() })
+  })
 }
 
 export async function updateTask(task: TaskViewModel, patch: Partial<Task>): Promise<void> {
@@ -351,8 +354,9 @@ export async function buildSearchIndex(): Promise<SearchResult[]> {
   const results: SearchResult[] = []
 
   for (const day of days) {
-    if (day.notes.trim()) {
-      results.push({ date: day.date, kind: 'note', snippet: day.notes.slice(0, 120) })
+    const note = [day.notes, day.inkText].filter(Boolean).join('\n')
+    if (note.trim()) {
+      results.push({ date: day.date, kind: 'note', snippet: note })
     }
   }
   for (const task of tasks) {
@@ -366,7 +370,11 @@ export async function buildSearchIndex(): Promise<SearchResult[]> {
 export function searchIndex(index: SearchResult[], query: string): SearchResult[] {
   const q = query.trim().toLowerCase()
   if (!q) return []
-  return index.filter(r => r.snippet.toLowerCase().includes(q))
+  return index.filter(r => r.snippet.toLowerCase().includes(q)).map(result => {
+    const start = Math.max(0, result.snippet.toLowerCase().indexOf(q) - 45)
+    const end = start + Math.max(160, q.length)
+    return { ...result, snippet: `${start ? '…' : ''}${result.snippet.slice(start, end)}${end < result.snippet.length ? '…' : ''}` }
+  })
 }
 
 // ---------- Export / Import ----------

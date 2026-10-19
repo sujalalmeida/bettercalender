@@ -77,8 +77,7 @@ function GardenScene({ elapsedMs, running }: { elapsedMs: number; running: boole
       })}
       {FLOWERS.map((flower, index) => <GardenPlant key={index} flower={flower} elapsedMs={elapsedMs} />)}
     </svg>
-    {elapsedMs === 0 && <div class="focus-garden-empty">A quiet place to begin.</div>}
-    {running && <span class="focus-garden-live"><span /> GROWING WITH YOU</span>}
+    {running && <span class="focus-garden-live"><span /> GROWING</span>}
   </div>
 }
 
@@ -151,9 +150,8 @@ export function FocusMode() {
     <main class="focus-layout">
       <section class="focus-control-panel" aria-label="Focus stopwatch">
         <div class="focus-intro">
-          <span class="focus-eyebrow">YOUR QUIET SPACE</span>
-          <h1>GROW YOUR<br />FOCUS.</h1>
-          <p>Start the stopwatch and let your garden grow as you study. Take your time; every minute counts.</p>
+          <span class="focus-eyebrow">FOCUS</span>
+          <h1>FOCUS.</h1>
         </div>
         <div class="focus-clock-stack">
           <div class="focus-clock-card">
@@ -170,7 +168,7 @@ export function FocusMode() {
       <section class="focus-garden-panel" aria-label="Growing focus garden">
         <div class="focus-garden-top"><span>THE GARDEN</span><span>WHITE ROSES / RED ROSES / LILIES</span></div>
         <GardenScene elapsedMs={elapsedMs} running={running} />
-        <div class="focus-garden-bottom"><span>01 / GROWTH</span><span>Stay with the work. The garden will follow.</span></div>
+        <div class="focus-garden-bottom"><span>01 / GROWTH</span></div>
       </section>
     </main>
   </div>

@@ -30,11 +30,14 @@ async function generateJson(prompt: string, images: AIFile[] = []): Promise<stri
   const app = getApps()[0] ?? initializeApp(config)
   const user = getAuth(app).currentUser
   if (!user) throw new Error('Sign in under Settings → Cloud sync before using Gemini.')
-  const response = await fetch('/api/gemini', {
+  if (!/^https?:$/.test(window.location.protocol)) throw new Error('Open the deployed website or local development address. Gemini cannot run from an opened HTML file.')
+  const response = await fetch(new URL('/api/gemini', window.location.href), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
     body: JSON.stringify({ parts: [{ text: prompt }, ...images.map(image => ({ inlineData: image }))] })
   })
+  const contentType = response.headers.get('Content-Type') ?? ''
+  if (!contentType.includes('application/json')) throw new Error('The Gemini service is missing from this deployment. Rebuild and upload the complete dist folder, including _worker.js, to Cloudflare Pages.')
   const result = await response.json() as { text?: string; error?: string }
   if (!response.ok || !result.text) throw new Error(result.error || 'Gemini could not analyze this. Please try again.')
   return result.text

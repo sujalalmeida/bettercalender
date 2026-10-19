@@ -44,10 +44,10 @@ export function NotesEditor({ dateISO, initialNotes, autoFocus }: Props) {
   useEffect(() => {
     const onHide = () => { if (document.visibilityState === 'hidden') flush() }
     document.addEventListener('visibilitychange', onHide)
-    window.addEventListener('pagehide', onHide)
+    window.addEventListener('pagehide', flush)
     return () => {
       document.removeEventListener('visibilitychange', onHide)
-      window.removeEventListener('pagehide', onHide)
+      window.removeEventListener('pagehide', flush)
       flush()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,8 +73,8 @@ export function NotesEditor({ dateISO, initialNotes, autoFocus }: Props) {
     <textarea
       ref={textareaRef}
       class="notes-editor"
-      placeholder="Type or use Scribble with Apple Pencil…"
-      aria-label="Day notes; type or use Apple Pencil Scribble"
+      placeholder="Notes…"
+      aria-label="Day notes"
       value={value}
       onInput={handleInput}
       onBlur={flush}

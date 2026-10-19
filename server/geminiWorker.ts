@@ -1,5 +1,4 @@
-/** Cloudflare Pages advanced-mode worker. Only this file receives the Gemini key. */
-declare const __EMBEDDED_GEMINI_KEY__: string
+/** Cloudflare Worker. Gemini credentials come from a private runtime secret. */
 declare const __FIREBASE_WEB_API_KEY__: string
 declare const __GEMINI_MODEL__: string
 
@@ -36,12 +35,14 @@ export async function handleGeminiRequest(request: Request, apiKey: string, fire
     const account = await authResponse.json() as { users?: { localId?: string }[] }
     if (!account.users?.[0]?.localId) return json({ error: 'Your sign-in could not be verified.' }, 401)
 
-    const modelName = /^[a-z0-9.-]+$/.test(model) ? model : 'gemini-3.8-flash'
-    const geminiResponse = await requestFetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify({ contents: [{ role: 'user', parts: input.parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1 } })
+    const modelName = /^[a-z0-9.-]+$/.test(model) ? model : 'gemini-3.5-flash-lite'
+    const body = JSON.stringify({ contents: [{ role: 'user', parts: input.parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1 } })
+    const ask = (name: string) => requestFetch(`https://generativelanguage.googleapis.com/v1beta/models/${name}:generateContent`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body
     })
+    let geminiResponse = await ask(modelName)
+    // A busy model should not leave handwriting or study suggestions unusable.
+    if (geminiResponse.status === 503 && modelName !== 'gemini-3.5-flash-lite') geminiResponse = await ask('gemini-3.5-flash-lite')
     const data = await geminiResponse.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } }
     if (!geminiResponse.ok) return json({ error: `Gemini could not process this (${geminiResponse.status}). ${String(data.error?.message ?? '').slice(0, 240)}`.trim() }, 502)
     const text = data.candidates?.[0]?.content?.parts?.map(part => part.text ?? '').join('') ?? ''
@@ -55,7 +56,7 @@ export async function handleGeminiRequest(request: Request, apiKey: string, fire
 export default {
   fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const url = new URL(request.url)
-    if (url.pathname === '/api/gemini') return handleGeminiRequest(request, env.GEMINI_API_KEY || __EMBEDDED_GEMINI_KEY__, __FIREBASE_WEB_API_KEY__, __GEMINI_MODEL__)
+    if (url.pathname === '/api/gemini') return handleGeminiRequest(request, env.GEMINI_API_KEY || '', __FIREBASE_WEB_API_KEY__, __GEMINI_MODEL__)
     return env.ASSETS.fetch(request)
   }
 }

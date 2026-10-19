@@ -56,6 +56,13 @@ export function TaskRow({ task, category, onToggle, onDelete, onOpenDetails, onG
     setSwiping(false)
   }
 
+  function cancelSwipe() {
+    start.current = null
+    axisLocked.current = null
+    setDragX(0)
+    setSwiping(false)
+  }
+
   return (
     <li class="task-row-wrap">
       <div class="task-row-delete-bg" aria-hidden="true">
@@ -83,7 +90,7 @@ export function TaskRow({ task, category, onToggle, onDelete, onOpenDetails, onG
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
+          onPointerCancel={cancelSwipe}
         >
           <button class="task-row-grip" aria-label="Reorder task" onPointerDown={onGripPointerDown}>
             ⠿

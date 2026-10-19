@@ -4,6 +4,7 @@ import { addRecurrence, updateTask, updateFutureOccurrences } from '../db/reposi
 import type { Category, RepeatFrequency } from '../db/types'
 import { downloadICS, LEAD_TIME_LABELS, buildICS, type ReminderLeadTime } from '../lib/ics'
 import { createId } from '../lib/id'
+import { fromISODate } from '../lib/dates'
 
 interface Props {
   task: TaskViewModel
@@ -44,7 +45,7 @@ export function TaskDetailsEditor({ task, categories, defaultLeadTime, onClose }
         deadline,
         rule:
           repeatFreq === 'weekly'
-            ? { frequency: 'weekly', daysOfWeek: weeklyDays.length ? weeklyDays : [new Date(task.date).getDay()] }
+            ? { frequency: 'weekly', daysOfWeek: weeklyDays.length ? weeklyDays : [fromISODate(task.date).getDay()] }
             : repeatFreq === 'custom'
               ? { frequency: 'custom', intervalDays }
               : { frequency: repeatFreq }

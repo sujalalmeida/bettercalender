@@ -77,12 +77,12 @@ export function TodayTimeline({ date, onDateChange, weekStartsOn, onOpenDay }: P
         </div>
         <button class="timeline-week-arrow" aria-label="Next week" onClick={() => onDateChange(addDaysToDate(date, 7))}>›</button>
       </div>
-      <div class="timeline-day-actions"><span>{tasks.length ? `${tasks.length - completed} remaining` : 'Write freely with Apple Pencil'}</span><button onClick={event => onOpenDay(dateISO, event.currentTarget.getBoundingClientRect())}>Open day & whiteboard <span aria-hidden="true">↗</span></button></div>
+      <div class="timeline-day-actions"><span>{tasks.length ? `${tasks.length - completed} remaining` : 'Notes & whiteboard'}</span><button onClick={event => onOpenDay(dateISO, event.currentTarget.getBoundingClientRect())}>Open day & whiteboard <span aria-hidden="true">↗</span></button></div>
       <div class="timeline-section-heading"><h2>Tasks</h2><button class="timeline-add" onClick={() => setAdding(value => !value)} aria-expanded={adding}>{adding ? 'Close' : '+ Add task'}</button></div>
       {adding && <form class="timeline-add-form" onSubmit={saveTask}><label>Task<input autoFocus value={title} onInput={event => setTitle(event.currentTarget.value)} placeholder="What needs doing?" required /></label><div class="timeline-add-fields"><label>Time (optional)<input type="time" value={time} onInput={event => setTime(event.currentTarget.value)} /></label><label>Category<select value={categoryId} onChange={event => setCategoryId(event.currentTarget.value)}><option value="">None</option>{categories.map(category => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label></div><label class="timeline-deadline"><input type="checkbox" checked={deadline} onChange={event => setDeadline(event.currentTarget.checked)} /> Deadline</label>{error && <p role="alert">{error}</p>}<button type="submit">Add to {date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</button></form>}
       {anytime.length > 0 && <section class="timeline-group"><div class="timeline-group-label"><span class="timeline-rail-dot" /><span>Anytime</span></div><div class="timeline-group-items">{anytime.map(taskCard)}</div></section>}
       {timed.length > 0 && <section class="timeline-group"><div class="timeline-group-label"><span class="timeline-rail-dot" /><span>Scheduled</span></div><div class="timeline-group-items">{timed.map(taskCard)}</div></section>}
-      {tasks.length === 0 && <div class="timeline-empty"><h3>Nothing scheduled</h3><p>Add a task or open the day to take notes.</p><button onClick={() => setAdding(true)}>Add a task</button></div>}
+      {tasks.length === 0 && <div class="timeline-empty"><h3>Nothing scheduled</h3><button onClick={() => setAdding(true)}>Add a task</button></div>}
     </div>
   </section>
 }

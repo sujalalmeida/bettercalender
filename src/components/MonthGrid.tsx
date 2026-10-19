@@ -73,6 +73,9 @@ export function MonthGrid({ currentMonth, onMonthChange, weekStartsOn, expandedD
 
   function onPointerDown(e: PointerEvent) {
     if (expandedDate) return
+    // On narrow screens horizontal gestures scroll the larger cells.
+    const viewport = gridRef.current?.parentElement
+    if (viewport && viewport.scrollWidth > viewport.clientWidth) return
     swipeStart.current = { x: e.clientX, y: e.clientY }
     axisLocked.current = null
   }
@@ -122,6 +125,7 @@ export function MonthGrid({ currentMonth, onMonthChange, weekStartsOn, expandedD
         </div>
       </header>
 
+      <div class="month-calendar scroll-panel">
       <div class="weekday-row ui-chrome">
         {weekdayLabels.map((label) => (
           <div class="weekday-label" key={label}>
@@ -163,6 +167,7 @@ export function MonthGrid({ currentMonth, onMonthChange, weekStartsOn, expandedD
           )
           })}
         </div>)}
+      </div>
       </div>
       <span class="visually-hidden" aria-live="polite">
         {expandedDate ? `Expanded ${formatDayTitle(fromISODate(expandedDate))}` : 'Collapsed day view'}

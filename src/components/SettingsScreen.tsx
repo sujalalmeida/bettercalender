@@ -202,14 +202,6 @@ export default function SettingsScreen({ onClose }: Props) {
           {importMessage && <p class="settings-hint">{importMessage}</p>}
         </section>
 
-        <section class="settings-section">
-          <h3>About</h3>
-          <p class="settings-hint">
-            Plan saves immediately on this device and syncs to Firebase after sign-in when online. To install on an iPhone or iPad: open this page in Safari, tap the Share icon, then
-            "Add to Home Screen".
-          </p>
-          <p class="settings-hint">Due Soon and app badges update while you use Plan. For alerts when Plan is closed, export a task to Apple Calendar with an alert.</p>
-        </section>
       </div>
     </div>
   )

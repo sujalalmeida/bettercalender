@@ -19,10 +19,14 @@ export function Checklist({ dateISO, tasks, categories, defaultLeadTime }: Props
   const [undo, setUndo] = useState<{ title: string; restore: () => void } | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const dragId = useRef<string | null>(null)
+  const dragOrder = useRef<TaskViewModel[] | null>(null)
+  const dragCleanup = useRef<(() => void) | null>(null)
 
   useEffect(() => {
-    setLocalOrder(null)
+    if (!dragId.current) setLocalOrder(null)
   }, [tasks])
+
+  useEffect(() => () => dragCleanup.current?.(), [])
 
   useEffect(() => {
     if (!undo) return
@@ -53,16 +57,25 @@ export function Checklist({ dateISO, tasks, categories, defaultLeadTime }: Props
 
   function onGripPointerDown(taskId: string, e: PointerEvent) {
     e.preventDefault()
+    e.stopPropagation()
     dragId.current = taskId
+    dragOrder.current = [...items]
+    dragCleanup.current?.()
     window.addEventListener('pointermove', onDragMove)
     window.addEventListener('pointerup', onDragEnd, { once: true })
+    window.addEventListener('pointercancel', onDragCancel, { once: true })
+    dragCleanup.current = () => {
+      window.removeEventListener('pointermove', onDragMove)
+      window.removeEventListener('pointerup', onDragEnd)
+      window.removeEventListener('pointercancel', onDragCancel)
+    }
   }
 
   function onDragMove(e: PointerEvent) {
     const container = listRef.current
     if (!container || !dragId.current) return
     const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-task-row-id]'))
-    const currentIds = (localOrder ?? tasks).map((t) => t.id)
+    const currentIds = (dragOrder.current ?? []).map((t) => t.id)
     const fromIndex = currentIds.indexOf(dragId.current)
     if (fromIndex === -1) return
 
@@ -77,19 +90,28 @@ export function Checklist({ dateISO, tasks, categories, defaultLeadTime }: Props
     }
     if (toIndex === fromIndex) return
 
-    const next = [...(localOrder ?? tasks)]
+    const next = [...(dragOrder.current ?? [])]
     const [moved] = next.splice(fromIndex, 1)
     next.splice(toIndex, 0, moved)
+    dragOrder.current = next
     setLocalOrder(next)
   }
 
   async function onDragEnd() {
-    window.removeEventListener('pointermove', onDragMove)
-    const order = localOrder
+    dragCleanup.current?.()
+    const order = dragOrder.current
     dragId.current = null
+    dragOrder.current = null
     if (order) {
       await reorderTasks(dateISO, order.map((t) => t.id))
     }
+  }
+
+  function onDragCancel() {
+    dragCleanup.current?.()
+    dragId.current = null
+    dragOrder.current = null
+    setLocalOrder(null)
   }
 
   return (

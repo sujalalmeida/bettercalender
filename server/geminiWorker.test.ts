@@ -23,4 +23,16 @@ describe('Gemini Pages proxy', () => {
     expect(requestFetch.mock.calls[1][1].headers['x-goog-api-key']).toBe('private-gemini-key')
     expect(requestFetch.mock.calls[1][0]).toContain('/models/gemini-3.1-flash-lite:generateContent')
   })
+
+  it('uses a second model when the selected model is temporarily overloaded', async () => {
+    const requestFetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ users: [{ localId: 'student-1' }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: 'Busy' } }), { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"items":[]}' }] } }] }), { status: 200 }))
+    const response = await handleGeminiRequest(new Request('https://plan.example/api/gemini', {
+      method: 'POST', headers: { Authorization: 'Bearer firebase-token' }, body: JSON.stringify({ parts: [{ text: 'Review surgery' }] })
+    }), 'private-gemini-key', 'public-firebase-key', 'gemini-3.1-flash-lite', requestFetch)
+    expect(response.status).toBe(200)
+    expect(requestFetch.mock.calls[2][0]).toContain('/models/gemini-3.5-flash-lite:generateContent')
+  })
 })
