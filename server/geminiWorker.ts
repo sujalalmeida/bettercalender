@@ -1,4 +1,5 @@
 /** Cloudflare Worker. Gemini credentials come from a private runtime secret. */
+import { personalAI, type PersonalAI, type PreparedAnalysis } from './personalAI'
 declare const __FIREBASE_WEB_API_KEY__: string
 declare const __GEMINI_MODEL__: string
 
@@ -9,13 +10,13 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
 })
 
-export async function handleGeminiRequest(request: Request, apiKey: string, firebaseApiKey: string, model: string, requestFetch: typeof fetch = fetch): Promise<Response> {
+export async function handleGeminiRequest(request: Request, apiKey: string, firebaseApiKey: string, model: string, requestFetch: typeof fetch = fetch, integration: PersonalAI = personalAI): Promise<Response> {
   if (request.method !== 'POST') return json({ error: 'Use POST for Gemini requests.' }, 405)
   if (!apiKey || !firebaseApiKey) return json({ error: 'Gemini is not configured in this deployment.' }, 503)
   const token = /^Bearer (.+)$/i.exec(request.headers.get('Authorization') ?? '')?.[1]
   if (!token) return json({ error: 'Sign in under Settings → Cloud sync before using Gemini.' }, 401)
 
-  let input: { parts?: GeminiPart[] }
+  let input: { parts?: GeminiPart[]; purpose?: string }
   try {
     const body = await request.text()
     if (body.length > 16_000_000) return json({ error: 'This upload is too large.' }, 413)
@@ -27,6 +28,13 @@ export async function handleGeminiRequest(request: Request, apiKey: string, fire
       part.inlineData.data.length <= 12_000_000 && /^(image\/(jpeg|png|webp)|application\/pdf|audio\/(webm|mp4|mpeg))$/.test(part.inlineData.mimeType))
   )) return json({ error: 'Invalid Gemini request.' }, 400)
 
+  let analysis: PreparedAnalysis | null = null
+  if (input.purpose !== undefined) {
+    try { analysis = integration.prepare({ purpose: input.purpose, parts: input.parts }) }
+    catch { return json({ error: 'Invalid analysis summary.' }, 400) }
+    if (!analysis) return json({ error: 'Invalid analysis type.' }, 400)
+  }
+
   try {
     const authResponse = await requestFetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(firebaseApiKey)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: token })
@@ -36,7 +44,11 @@ export async function handleGeminiRequest(request: Request, apiKey: string, fire
     if (!account.users?.[0]?.localId) return json({ error: 'Your sign-in could not be verified.' }, 401)
 
     const modelName = /^[a-z0-9.-]+$/.test(model) ? model : 'gemini-3.5-flash-lite'
-    const body = JSON.stringify({ contents: [{ role: 'user', parts: input.parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.1 } })
+    const body = JSON.stringify({
+      contents: [{ role: 'user', parts: input.parts }],
+      ...(analysis ? { systemInstruction: { parts: [{ text: analysis.systemInstruction }] } } : {}),
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.1, ...(analysis ? { responseSchema: analysis.responseSchema } : {}) }
+    })
     const ask = (name: string) => requestFetch(`https://generativelanguage.googleapis.com/v1beta/models/${name}:generateContent`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body
     })
@@ -47,6 +59,10 @@ export async function handleGeminiRequest(request: Request, apiKey: string, fire
     if (!geminiResponse.ok) return json({ error: `Gemini could not process this (${geminiResponse.status}). ${String(data.error?.message ?? '').slice(0, 240)}`.trim() }, 502)
     const text = data.candidates?.[0]?.content?.parts?.map(part => part.text ?? '').join('') ?? ''
     if (!text) return json({ error: 'Gemini returned no text. Please try again.' }, 502)
+    if (analysis) {
+      try { return json({ text: analysis.validate(text) }) }
+      catch { return json({ error: 'Gemini returned an analysis that could not be verified. Please try again.' }, 502) }
+    }
     return json({ text })
   } catch {
     return json({ error: 'Gemini is temporarily unavailable. Please try again.' }, 502)

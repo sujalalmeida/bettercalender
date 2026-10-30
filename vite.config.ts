@@ -3,10 +3,14 @@ import preact from '@preact/preset-vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { build as buildWorker } from 'esbuild'
 import { writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { handleGeminiRequest } from './server/geminiWorker'
 
 export default defineConfig(({ mode }) => {
   const values = loadEnv(mode, process.cwd(), '')
+  const localAIPath = resolve(process.cwd(), 'private/server.ts')
+  const personalAIPath = existsSync(localAIPath) ? localAIPath : resolve(process.cwd(), 'server/personalAI.ts')
   let outputDir = 'dist'
   const geminiProxy: Plugin = {
     name: 'gemini-cloudflare-proxy',
@@ -22,7 +26,8 @@ export default defineConfig(({ mode }) => {
           body: req.method === 'POST' ? Buffer.concat(chunks) : undefined,
           duplex: 'half'
         } as RequestInit & { duplex: 'half' })
-        const response = await handleGeminiRequest(request, values.GEMINI_API_KEY || '', values.VITE_FIREBASE_API_KEY || '', values.VITE_GEMINI_MODEL || 'gemini-3.8-flash')
+        const { personalAI } = await server.ssrLoadModule(personalAIPath)
+        const response = await handleGeminiRequest(request, values.GEMINI_API_KEY || '', values.VITE_FIREBASE_API_KEY || '', values.VITE_GEMINI_MODEL || 'gemini-3.8-flash', fetch, personalAI)
         res.statusCode = response.status
         response.headers.forEach((value, key) => res.setHeader(key, value))
         res.end(Buffer.from(await response.arrayBuffer()))
@@ -32,6 +37,9 @@ export default defineConfig(({ mode }) => {
       await buildWorker({
         entryPoints: ['server/geminiWorker.ts'], outfile: `${outputDir}/_worker.js`,
         bundle: true, format: 'esm', platform: 'browser', target: 'es2022', minify: true,
+        plugins: [{ name: 'personal-ai', setup(build) {
+          build.onResolve({ filter: /^\.\/personalAI$/ }, args => args.importer.endsWith('/server/geminiWorker.ts') ? { path: personalAIPath } : undefined)
+        } }],
         define: {
           __FIREBASE_WEB_API_KEY__: JSON.stringify(values.VITE_FIREBASE_API_KEY || ''),
           __GEMINI_MODEL__: JSON.stringify(values.VITE_GEMINI_MODEL || 'gemini-3.8-flash')

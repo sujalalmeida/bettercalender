@@ -1,8 +1,9 @@
 import Dexie, { type Table, type Transaction } from 'dexie'
 import { db, type SyncChange } from '../db/db'
 import { createId } from './id'
+import { personalFeature } from '../personal/feature'
 
-export const SYNC_TABLES = ['days', 'ink', 'tasks', 'recurrences', 'categories', 'templates', 'revisionTopics', 'skills', 'milestones'] as const
+export const SYNC_TABLES = ['days', 'ink', 'tasks', 'recurrences', 'categories', 'templates', 'revisionTopics', 'skills', 'milestones', ...personalFeature.syncTables] as const
 export type SyncTable = (typeof SYNC_TABLES)[number]
 const listeners = new Set<(change: SyncChange) => void>()
 let pending: Promise<void> = Promise.resolve()
@@ -28,7 +29,7 @@ export function enqueueChange(collection: SyncTable, id: string): Promise<void> 
 // Remote transactions are marked so received records are never echoed back.
 export function installSyncTracking(): void {
   for (const name of SYNC_TABLES) {
-    const table = db[name] as unknown as Table<Record<string, unknown>, string>
+    const table = db.table<Record<string, unknown>, string>(name)
     table.hook('creating', (key, value, tx) => {
       if ((tx as RemoteTransaction).cloudRemote) return
       const id = String(key ?? value[name === 'days' || name === 'ink' ? 'date' : 'id'])

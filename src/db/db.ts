@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type { Category, Day, InkDocument, Milestone, Recurrence, RevisionTopic, SettingsRow, SkillEntry, Task, Template } from './types'
+import { personalFeature } from '../personal/feature'
 
 export interface SyncChange { key: string; collection: string; id: string; revision: string }
 
@@ -41,6 +42,8 @@ export class PlanDatabase extends Dexie {
       skills: '&id, kind, status, rotation, updatedAt',
       milestones: '&id, dueDate, status, kind, updatedAt'
     })
+
+    this.version(5).stores(personalFeature.databaseStores)
 
     // Example migration for future changes (bumping version adds an index
     // without touching existing rows, so her data is preserved):

@@ -3,6 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWith
 import { collection, deleteDoc, doc, getDoc, getDocsFromServer, getFirestore, onSnapshot, setDoc, type DocumentData, type Unsubscribe } from 'firebase/firestore'
 import { db, type SyncChange } from '../db/db'
 import { SYNC_TABLES, type SyncTable, enqueueChange, onSyncChange, waitForQueuedChanges, applyRemoteChange } from './syncQueue'
+import { personalFeature } from '../personal/feature'
 
 export interface CloudState { email: string | null; status: string; syncing: boolean; configured: boolean }
 const config = {
@@ -66,13 +67,14 @@ async function networkDeadline<T>(operation: Promise<T>): Promise<T> {
 }
 
 const primaryKey = (table: SyncTable) => table === 'days' || table === 'ink' ? 'date' : 'id'
-const localTable = (name: SyncTable) => db[name] as typeof db.days
+const localTable = (name: SyncTable) => db.table(name) as typeof db.days
 const recordKey = (table: SyncTable, id: string) => `${table}:${id}`
 const cloudDocId = (key: string) => encodeURIComponent(key)
 const cloudRecords = (uid: string) => collection(firestore!, 'users', uid, 'records')
 const inkPart = (uid: string, date: string, revision: string, index: number) =>
   doc(firestore!, 'users', uid, 'ink', encodeURIComponent(date), 'versions', revision, 'parts', String(index))
 const INK_CHUNK_LENGTH = 100_000
+const hasPendingChanges = async () => (await db.syncChanges.filter(change => SYNC_TABLES.includes(change.collection)).count()) > 0
 
 function decodeRecord(raw: DocumentData): { table: SyncTable; id: string; payload?: Record<string, unknown>; deleted?: boolean; updatedAt: number } | null {
   if (!SYNC_TABLES.includes(raw.table)) return null
@@ -95,12 +97,15 @@ async function receive(raw: DocumentData, uid: string, expectedGeneration: numbe
     item.payload = JSON.parse(chunks.map(snap => snap.data()!.data as string).join(''))
   }
   if (!item.deleted && !item.payload) return
+  const personalHooks = personalFeature.syncTables.includes(item.table) ? (await personalFeature.loadSyncHooks?.())?.default : undefined
+  if (personalHooks && !item.deleted) personalHooks.validateRecord(item.id, item.payload)
   // Check local edits and apply the cloud version in one transaction. In particular,
   // a slow Pencil download must not replace strokes written while it was in flight.
   await waitForQueuedChanges()
   let requeue = false
   await applyRemoteChange(table, async () => {
     if (expectedGeneration !== generation || await db.syncChanges.get(key)) return
+    if (personalHooks && !item.deleted && item.payload) await personalHooks.beforeReceive(item.payload)
     const latest = await table.get(item.id) as Record<string, unknown> | undefined
     if (latest && (Number(latest.updatedAt) || 0) > item.updatedAt) { requeue = true; return }
     if (item.deleted) {
@@ -149,6 +154,12 @@ async function uploadChange(uid: string, change: SyncChange): Promise<void> {
     // Firestore rejects undefined values. JSON also keeps the remote record compact.
     ...(payload ? { payload: JSON.parse(JSON.stringify(payload)) } : {})
   }
+  if (personalFeature.syncTables.includes(table)) {
+    const hooks = (await personalFeature.loadSyncHooks?.())?.default
+    if (!hooks) throw new Error('This optional data integration is unavailable.')
+    await hooks.upload({ firestore: firestore!, collection: cloudRecords(uid), change, record, deadline: networkDeadline })
+    return
+  }
   if (table === 'ink' && payload) {
     const oldManifest = await networkDeadline(getDoc(doc(cloudRecords(uid), cloudDocId(change.key))))
     const old = oldManifest.data()
@@ -186,7 +197,8 @@ async function flush(): Promise<void> {
     await waitForQueuedChanges()
     const changes = await db.syncChanges.toArray()
     // Send small records first so a large whiteboard cannot hold up tasks.
-    changes.sort((a, b) => Number(a.collection === 'ink') - Number(b.collection === 'ink'))
+    const priority = (change: SyncChange) => personalFeature.syncTables.includes(change.collection) && change.id === 'config' ? -1 : change.collection === 'ink' ? 1 : 0
+    changes.sort((a, b) => priority(a) - priority(b))
     for (const change of changes) {
       if (currentUser?.uid !== uid || expectedGeneration !== generation) break
       if (!SYNC_TABLES.includes(change.collection as SyncTable)) continue
@@ -202,7 +214,7 @@ async function flush(): Promise<void> {
         failed = true
       }
     }
-    if (expectedGeneration === generation) emit({ status: failed ? 'Saved on this device. Retrying sync…' : readError ? 'Some notes are waiting to sync.' : (await db.syncChanges.count()) ? 'Changes waiting to sync.' : 'Synced' })
+    if (expectedGeneration === generation) emit({ status: failed ? 'Saved on this device. Retrying sync…' : readError ? 'Some notes are waiting to sync.' : (await hasPendingChanges()) ? 'Changes waiting to sync.' : 'Synced' })
   } catch (error) {
     console.error('Cloud sync failed', error)
     failed = true
@@ -214,7 +226,7 @@ async function flush(): Promise<void> {
     if (expectedGeneration === generation) {
       emit({ syncing: false })
       if (failed) { scheduleFlush(retryDelay); retryDelay = Math.min(retryDelay * 2, 30000) }
-      else { if (!readError) retryDelay = 1000; if (again || await db.syncChanges.count()) scheduleFlush(0) }
+      else { if (!readError) retryDelay = 1000; if (again || await hasPendingChanges()) scheduleFlush(0) }
     } else if (currentUser && connected) scheduleFlush(0)
   }
 }

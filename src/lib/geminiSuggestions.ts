@@ -24,23 +24,32 @@ export function parseSuggestions(raw: string, target: Target): Suggestion[] {
 }
 
 export type AIFile = { mimeType: string; data: string }
-async function generateJson(prompt: string, images: AIFile[] = []): Promise<string> {
+export async function generateJson(prompt: string, images: AIFile[] = [], options: { purpose?: string; signal?: AbortSignal } = {}): Promise<string> {
   const config = { apiKey: import.meta.env.VITE_FIREBASE_API_KEY, authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID, appId: import.meta.env.VITE_FIREBASE_APP_ID }
   if (!config.apiKey || !config.projectId || !config.appId) throw new Error('Gemini is not connected yet. Ask the app owner to finish setup.')
   const app = getApps()[0] ?? initializeApp(config)
-  const user = getAuth(app).currentUser
+  const auth = getAuth(app)
+  await auth.authStateReady()
+  const user = auth.currentUser
   if (!user) throw new Error('Sign in under Settings → Cloud sync before using Gemini.')
   if (!/^https?:$/.test(window.location.protocol)) throw new Error('Open the deployed website or local development address. Gemini cannot run from an opened HTML file.')
-  const response = await fetch(new URL('/api/gemini', window.location.href), {
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  if (options.signal?.aborted) controller.abort()
+  options.signal?.addEventListener('abort', abort, { once: true })
+  const timeout = setTimeout(abort, 60000)
+  try { const response = await fetch(new URL('/api/gemini', window.location.href), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
-    body: JSON.stringify({ parts: [{ text: prompt }, ...images.map(image => ({ inlineData: image }))] })
+    body: JSON.stringify({ parts: [{ text: prompt }, ...images.map(image => ({ inlineData: image }))], ...(options.purpose ? { purpose: options.purpose } : {}) }),
+    signal: controller.signal
   })
   const contentType = response.headers.get('Content-Type') ?? ''
-  if (!contentType.includes('application/json')) throw new Error('The Gemini service is missing from this deployment. Rebuild and upload the complete dist folder, including _worker.js, to Cloudflare Pages.')
+  if (!contentType.includes('application/json')) throw new Error('The Gemini service is missing from this deployment. Run npm run deploy:worker from the project folder.')
   const result = await response.json() as { text?: string; error?: string }
   if (!response.ok || !result.text) throw new Error(result.error || 'Gemini could not analyze this. Please try again.')
   return result.text
+  } finally { clearTimeout(timeout); options.signal?.removeEventListener('abort', abort) }
 }
 
 export async function generateSuggestions(target: Target, note: string, file?: AIFile): Promise<Suggestion[]> {

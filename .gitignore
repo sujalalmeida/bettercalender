@@ -13,3 +13,7 @@ npm-debug.log*
 
 .vscode/
 .idea/
+
+# Optional personal features are kept locally and included in local builds only.
+/private/
+*.tsbuildinfo

@@ -3,6 +3,7 @@ import { createId } from '../lib/id'
 import { expandRecurrence } from '../lib/recurrence'
 import { addDaysToDate, fromISODate, toISODate, todayISO } from '../lib/dates'
 import { enqueueChange, SYNC_TABLES } from '../lib/syncQueue'
+import { personalFeature } from '../personal/feature'
 import type { Category, Day, InkDocument, Recurrence, RepeatRule, SettingsRow, Task, Template, RevisionTopic, SkillEntry, Milestone } from './types'
 
 export interface TaskViewModel extends Task {
@@ -416,7 +417,9 @@ export async function importAll(bundle: ExportBundle, mode: ImportMode): Promise
   const removedKeys: { table: (typeof SYNC_TABLES)[number]; id: string }[] = []
   if (mode === 'replace') {
     for (const table of SYNC_TABLES) {
-      const rows = await db[table].toArray() as unknown as Record<string, unknown>[]
+      // Optional personal records have separate backups.
+      if (personalFeature.syncTables.includes(table)) continue
+      const rows = await db.table(table).toArray() as unknown as Record<string, unknown>[]
       for (const row of rows) removedKeys.push({ table, id: String(row[table === 'days' || table === 'ink' ? 'date' : 'id']) })
     }
   }

@@ -15,6 +15,7 @@ import { setAppBadgeCount } from './lib/appBadge'
 import { useLazyComponent } from './lib/useLazyComponent'
 import { useObservable } from './lib/useObservable'
 import { transcribeDayAfterClose } from './lib/inkTranscription'
+import { personalFeature } from './personal/feature'
 
 type View = 'today' | 'month' | 'week' | 'revision' | 'skills' | 'milestones'
 
@@ -143,6 +144,7 @@ export function App({ initialStorageNotice }: { initialStorageNotice: string | n
           </div>
         </div>
         <a class="focus-launch" href="?focus=1" target="plan-focus" aria-label="Open Focus Garden in a separate window">Focus <span aria-hidden="true">↗</span></a>
+        {personalFeature.launch && <a class="focus-launch" href={`?${personalFeature.launch.query}=1`} target={personalFeature.launch.target} aria-label={`Open ${personalFeature.launch.label} in a separate window`}>{personalFeature.launch.label} <span aria-hidden="true">↗</span></a>}
         <button class="icon-btn" aria-label="Settings" onClick={() => setShowSettings(true)}>
           ⚙
         </button>

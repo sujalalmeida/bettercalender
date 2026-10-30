@@ -1,5 +1,6 @@
 import { render } from 'preact'
 import { App } from './App'
+import { personalFeature } from './personal/feature'
 import { ensureSeedData } from './db/db'
 import { db } from './db/db'
 import { createId } from './lib/id'
@@ -32,7 +33,10 @@ async function start() {
       const persisted = await navigator.storage.persisted()
       if (!persisted) storageDenied = !(await navigator.storage.persist())
     }
-    render(<App initialStorageNotice={dataMissing ? 'Your saved data may have been cleared by this device. Import your latest backup in Settings to restore it.' : storageDenied && !localStorage.getItem('plan.storage-explained') ? 'This device could not guarantee permanent storage. Please export a backup regularly in Settings.' : null} />, root)
+    if (personalFeature.launch && personalFeature.loadPage && new URLSearchParams(window.location.search).get(personalFeature.launch.query) === '1') {
+      const PersonalPage = await personalFeature.loadPage()
+      render(<PersonalPage />, root)
+    } else render(<App initialStorageNotice={dataMissing ? 'Your saved data may have been cleared by this device. Import your latest backup in Settings to restore it.' : storageDenied && !localStorage.getItem('plan.storage-explained') ? 'This device could not guarantee permanent storage. Please export a backup regularly in Settings.' : null} />, root)
     // Restore persisted Firebase sessions even if the local sync preference is missing.
     const loadCloud = () => { void import('./lib/cloudSync').then(module => module.startCloudSync()).catch(error => console.error('Could not start cloud sync', error)) }
     if ('requestIdleCallback' in window) window.requestIdleCallback(loadCloud, { timeout: 2000 })

@@ -19,6 +19,7 @@ vi.mock('firebase/firestore', () => ({
   collection: (_ref: unknown, ...parts: string[]) => ({ path: parts.join('/') }),
   doc: (ref: { path?: string }, ...parts: string[]) => ({ path: [ref.path, ...parts].filter(Boolean).join('/') }),
   getDoc: cloud.getDoc, getDocsFromServer: cloud.read, setDoc: cloud.write, deleteDoc: vi.fn().mockResolvedValue(undefined),
+  runTransaction: (_db: unknown, callback: (tx: unknown) => Promise<unknown>) => callback({ get: cloud.getDoc, set: cloud.write }),
   onSnapshot: (_ref: unknown, callback: typeof cloud.snapshot) => { cloud.snapshot = callback; return () => { cloud.snapshot = null } }
 }))
 
@@ -64,6 +65,13 @@ afterAll(async () => {
 })
 
 describe('cloud sync recovery', () => {
+  it('preserves queued optional records without retrying forever when their module is absent', async () => {
+    await db.syncChanges.put({ key: 'optional-store:record', collection: 'optional-store', id: 'record', revision: 'pending' })
+    cloud.authChanged!(user)
+    await vi.waitFor(() => expect(sync.getCloudState().status).toBe('Synced'))
+    expect(await db.syncChanges.get('optional-store:record')).toBeDefined()
+    expect(cloud.write).not.toHaveBeenCalled()
+  })
   it('preserves the signed-in session when local data belongs to another account', async () => {
     await db.settings.put({ key: 'syncAccountId', value: 'another-account' })
     cloud.authChanged!(user)

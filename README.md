@@ -93,6 +93,14 @@ After closing a day, Plan transcribes changed Pencil pages with Gemini and shows
 
 ## Project layout
 
+### Optional local features
+
+Personal additions can live under `private/`, which Git ignores. A local `private/entry.ts` provides the optional page and storage hooks; `private/server.ts` provides its optional server analysis integration. When those files are absent, the app builds as the standard calendar.
+
+`npm run deploy:worker` builds the files present on this computer and uploads that build. A GitHub build cannot include ignored local files, so use local deployment for a personal edition. Back up `private/` separately or keep it in a separate private repository. Browser code included in a deployment is still inspectable by visitors; excluding source from GitHub does not hide the compiled browser code.
+
+If the same live site also deploys automatically from GitHub, disable that automatic deployment or use a separate public demo destination. Otherwise, a GitHub push can replace the personal edition with the standard calendar.
+
 ```
 src/
   components/   UI components (MonthGrid, DayCell, DayPanelContent, Checklist, …)
