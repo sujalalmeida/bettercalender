@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'preact/hooks'
 import { getRect, prefersReducedMotion } from '../lib/flip'
 import { useEscapeKey } from '../lib/useEscapeKey'
 import { DayPanelContent } from './DayPanelContent'
+import { flushInkForDate } from '../lib/inkSaveCoordinator'
 
 interface Props {
   dateISO: string
@@ -20,6 +21,8 @@ export function ExpandOverlay({ dateISO, originRect, onClose, onNavigateDay }: P
   const dragStart = useRef<{ y: number } | null>(null)
   const [dragY, setDragY] = useState(0)
   const [dragging, setDragging] = useState(false)
+  const transitionBusy = useRef(false)
+  const [saveError, setSaveError] = useState('')
 
   useLayoutEffect(() => {
     const card = cardRef.current
@@ -51,7 +54,11 @@ export function ExpandOverlay({ dateISO, originRect, onClose, onNavigateDay }: P
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function handleClose() {
+  async function handleClose() {
+    if (transitionBusy.current) return
+    transitionBusy.current = true
+    try { await flushInkForDate(dateISO) }
+    catch { transitionBusy.current = false; setSaveError('Your handwriting could not be saved. Keep this day open and try again.'); return }
     const card = cardRef.current
     const backdrop = backdropRef.current
     if (!card || prefersReducedMotion()) {
@@ -74,6 +81,14 @@ export function ExpandOverlay({ dateISO, originRect, onClose, onNavigateDay }: P
     )
     backdrop?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: DURATION, easing: 'ease-out' })
     anim.onfinish = () => onClose()
+  }
+
+  async function navigateDay(delta: 1 | -1) {
+    if (transitionBusy.current) return
+    transitionBusy.current = true
+    try { await flushInkForDate(dateISO); setSaveError(''); onNavigateDay(delta) }
+    catch { setSaveError('Your handwriting could not be saved. Keep this day open and try again.') }
+    finally { transitionBusy.current = false }
   }
 
   useEscapeKey(handleClose)
@@ -115,11 +130,12 @@ export function ExpandOverlay({ dateISO, originRect, onClose, onNavigateDay }: P
           onPointerDown={onHeaderPointerDown}
           onPointerMove={onHeaderPointerMove}
           onPointerUp={onHeaderPointerUp}
-          onPointerCancel={onHeaderPointerUp}
+          onPointerCancel={() => { setDragY(0); setDragging(false); dragStart.current = null }}
         >
           <span class="expand-card-grabber" aria-hidden="true" />
         </div>
-        <DayPanelContent dateISO={dateISO} onClose={handleClose} onNavigateDay={onNavigateDay} />
+        {saveError && <p class="workspace-error" role="alert">{saveError}</p>}
+        <DayPanelContent dateISO={dateISO} onClose={handleClose} onNavigateDay={navigateDay} />
       </div>
     </div>
   )
