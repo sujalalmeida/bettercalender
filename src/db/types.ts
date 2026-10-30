@@ -19,9 +19,9 @@ export interface Day {
 }
 
 /** Vector ink is stored in page coordinates so it stays sharp after rotation or resizing. */
-export interface InkPoint { x: number; y: number; pressure: number }
-export interface InkStroke { id: string; color: string; size: number; points: InkPoint[] }
-export interface InkPage { id: string; strokes: InkStroke[] }
+export interface InkPoint { x: number; y: number; pressure: number; tilt?: number }
+export interface InkStroke { id: string; color: string; size: number; points: InkPoint[]; tool?: 'pen' | 'pencil' | 'highlighter'; shape?: 'line' | 'rectangle' | 'ellipse' }
+export interface InkPage { id: string; strokes: InkStroke[]; paper?: 'plain' | 'ruled' | 'grid' | 'dots' }
 export interface InkDocument { date: string; pages: InkPage[]; updatedAt: number }
 
 export interface Task {

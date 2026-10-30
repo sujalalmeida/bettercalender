@@ -57,11 +57,12 @@ function isTemplate(v: unknown): boolean {
 
 function isInkDocument(v: unknown): boolean {
   return isObject(v) && isDate(v.date) && isNumber(v.updatedAt) && isArray(v.pages) && v.pages.every(page =>
-    isObject(page) && isString(page.id) && isArray(page.strokes) && page.strokes.every(stroke =>
+    isObject(page) && isString(page.id) && optional(page.paper, value => ['plain', 'ruled', 'grid', 'dots'].includes(String(value))) && isArray(page.strokes) && page.strokes.every(stroke =>
       isObject(stroke) && isString(stroke.id) && isString(stroke.color) && /^#[0-9a-fA-F]{6}$/.test(stroke.color) &&
+      optional(stroke.tool, value => ['pen', 'pencil', 'highlighter'].includes(String(value))) && optional(stroke.shape, value => ['line', 'rectangle', 'ellipse'].includes(String(value))) &&
       isNumber(stroke.size) && stroke.size > 0 && stroke.size <= 100 && isArray(stroke.points) && stroke.points.length > 0 &&
       stroke.points.every(point => isObject(point) && isNumber(point.x) && isNumber(point.y) && isNumber(point.pressure) &&
-        point.x >= 0 && point.x <= 1000 && point.y >= 0 && point.y <= 1400 && point.pressure >= 0 && point.pressure <= 1)
+        point.x >= 0 && point.x <= 1000 && point.y >= 0 && point.y <= 1400 && point.pressure >= 0 && point.pressure <= 1 && optional(point.tilt, value => isNumber(value) && value >= 0 && value <= 1))
     )
   )
 }
