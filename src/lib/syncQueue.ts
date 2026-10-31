@@ -3,7 +3,7 @@ import { db, type SyncChange } from '../db/db'
 import { createId } from './id'
 import { personalFeature } from '../personal/feature'
 
-export const SYNC_TABLES = ['days', 'ink', 'tasks', 'recurrences', 'categories', 'templates', 'revisionTopics', 'skills', 'milestones', ...personalFeature.syncTables] as const
+export const SYNC_TABLES = ['days', 'ink', 'tasks', 'recurrences', 'categories', 'templates', 'revisionTopics', 'skills', 'milestones', 'focusGardens', 'focusSessions', ...personalFeature.syncTables] as const
 export type SyncTable = (typeof SYNC_TABLES)[number]
 const listeners = new Set<(change: SyncChange) => void>()
 let pending: Promise<void> = Promise.resolve()

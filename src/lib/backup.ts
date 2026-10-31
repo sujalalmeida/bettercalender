@@ -85,7 +85,7 @@ function isMilestone(v: unknown): boolean {
  */
 export function validateExportBundle(value: unknown): ExportBundle | null {
   if (!isObject(value)) return null
-  if (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== 4) return null
+  if (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== 4 && value.version !== 5) return null
   if (!isString(value.exportedAt) || Number.isNaN(Date.parse(value.exportedAt))) return null
   if (!isArray(value.days) || !value.days.every(isDay)) return null
   if (!isArray(value.tasks) || !value.tasks.every(isTask)) return null
@@ -95,7 +95,8 @@ export function validateExportBundle(value: unknown): ExportBundle | null {
   if (value.version >= 2 && (!isArray(value.settings) || !value.settings.every(v => isObject(v) && isString(v.key)))) return null
   if (value.version >= 3 && (!isArray(value.ink) || !value.ink.every(isInkDocument))) return null
 
-  if (value.version === 4 && (!isArray(value.revisionTopics) || !value.revisionTopics.every(isRevision) || !isArray(value.skills) || !value.skills.every(isSkill) || !isArray(value.milestones) || !value.milestones.every(isMilestone))) return null
+  if ((value.version === 4 || value.version === 5) && (!isArray(value.revisionTopics) || !value.revisionTopics.every(isRevision) || !isArray(value.skills) || !value.skills.every(isSkill) || !isArray(value.milestones) || !value.milestones.every(isMilestone))) return null
 
+  if (value.version === 5 && (!isArray(value.focusGardens) || !value.focusGardens.every(v => isObject(v) && isString(v.id) && isString(v.generation) && isNumber(v.seed) && isNumber(v.createdAt) && isNumber(v.updatedAt)) || !isArray(value.focusSessions) || !value.focusSessions.every(v => isObject(v) && isString(v.id) && isString(v.gardenId) && isNumber(v.elapsedMs) && v.elapsedMs >= 0 && isNumber(v.createdAt) && isNumber(v.updatedAt)))) return null
   return value as unknown as ExportBundle
 }

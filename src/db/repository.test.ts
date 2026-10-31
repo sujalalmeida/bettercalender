@@ -162,7 +162,7 @@ describe('getTasksForRange', () => {
   it('round-trips settings through a backup', async () => {
     await setSetting('theme', 'dark')
     const bundle = await exportAll()
-    expect(bundle.version).toBe(4)
+    expect(bundle.version).toBe(5)
     await setSetting('theme', 'light')
     await importAll(bundle, 'replace')
     expect(await getSetting('theme', 'system')).toBe('dark')

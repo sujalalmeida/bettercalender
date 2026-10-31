@@ -12,7 +12,7 @@ function safeTime(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
 }
 
-export function parseFocusTimer(raw: string | null, now = Date.now()): FocusTimerState {
+export function parseFocusTimer(raw: string | null, now = Date.now(), continueInBackground = false): FocusTimerState {
   if (!raw) return { ...EMPTY_FOCUS_TIMER }
   try {
     const value = JSON.parse(raw) as Record<string, unknown>
@@ -23,7 +23,7 @@ export function parseFocusTimer(raw: string | null, now = Date.now()): FocusTime
       return { elapsedMs, startedAt: null, lastSeenAt: null }
     }
     // A closed or suspended window cannot earn focus time indefinitely.
-    if (now - lastSeenAt > 30_000) {
+    if (!continueInBackground && now - lastSeenAt > 30_000) {
       return { elapsedMs: elapsedMs + lastSeenAt - startedAt, startedAt: null, lastSeenAt: null }
     }
     return { elapsedMs, startedAt, lastSeenAt }

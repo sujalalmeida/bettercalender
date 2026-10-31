@@ -4,7 +4,7 @@ import { expandRecurrence } from '../lib/recurrence'
 import { addDaysToDate, fromISODate, toISODate, todayISO } from '../lib/dates'
 import { enqueueChange, SYNC_TABLES } from '../lib/syncQueue'
 import { personalFeature } from '../personal/feature'
-import type { Category, Day, InkDocument, Recurrence, RepeatRule, SettingsRow, Task, Template, RevisionTopic, SkillEntry, Milestone } from './types'
+import type { Category, Day, InkDocument, Recurrence, RepeatRule, SettingsRow, Task, Template, RevisionTopic, SkillEntry, Milestone, FocusGarden, FocusSession } from './types'
 
 export interface TaskViewModel extends Task {
   /** True when this occurrence only exists virtually (expanded from a Recurrence, not yet written to the tasks table). */
@@ -381,7 +381,7 @@ export function searchIndex(index: SearchResult[], query: string): SearchResult[
 // ---------- Export / Import ----------
 
 export interface ExportBundle {
-  version: 1 | 2 | 3 | 4
+  version: 1 | 2 | 3 | 4 | 5
   exportedAt: string
   days: Day[]
   tasks: Task[]
@@ -393,10 +393,12 @@ export interface ExportBundle {
   revisionTopics?: RevisionTopic[]
   skills?: SkillEntry[]
   milestones?: Milestone[]
+  focusGardens?: FocusGarden[]
+  focusSessions?: FocusSession[]
 }
 
 export async function exportAll(): Promise<ExportBundle> {
-  const [days, tasks, recurrences, categories, templates, settings, ink, revisionTopics, skills, milestones] = await Promise.all([
+  const [days, tasks, recurrences, categories, templates, settings, ink, revisionTopics, skills, milestones, focusGardens, focusSessions] = await Promise.all([
     db.days.toArray(),
     db.tasks.toArray(),
     db.recurrences.toArray(),
@@ -406,9 +408,11 @@ export async function exportAll(): Promise<ExportBundle> {
     db.ink.toArray(),
     db.revisionTopics.toArray(),
     db.skills.toArray(),
-    db.milestones.toArray()
+    db.milestones.toArray(),
+    db.focusGardens.toArray(),
+    db.focusSessions.toArray()
   ])
-  return { version: 4, exportedAt: new Date().toISOString(), days, tasks, recurrences, categories, templates, settings: settings.filter(row => !['syncAccountId', 'installationId'].includes(row.key)), ink, revisionTopics, skills, milestones }
+  return { version: 5, exportedAt: new Date().toISOString(), days, tasks, recurrences, categories, templates, settings: settings.filter(row => !['syncAccountId', 'installationId'].includes(row.key)), ink, revisionTopics, skills, milestones, focusGardens, focusSessions }
 }
 
 export type ImportMode = 'merge' | 'replace'
@@ -418,12 +422,12 @@ export async function importAll(bundle: ExportBundle, mode: ImportMode): Promise
   if (mode === 'replace') {
     for (const table of SYNC_TABLES) {
       // Optional personal records have separate backups.
-      if (personalFeature.syncTables.includes(table)) continue
+      if (personalFeature.syncTables.includes(table) || bundle.version !== 5 && (table === 'focusGardens' || table === 'focusSessions')) continue
       const rows = await db.table(table).toArray() as unknown as Record<string, unknown>[]
       for (const row of rows) removedKeys.push({ table, id: String(row[table === 'days' || table === 'ink' ? 'date' : 'id']) })
     }
   }
-  await db.transaction('rw', [db.days, db.tasks, db.recurrences, db.categories, db.templates, db.settings, db.ink, db.revisionTopics, db.skills, db.milestones], async () => {
+  await db.transaction('rw', [db.days, db.tasks, db.recurrences, db.categories, db.templates, db.settings, db.ink, db.revisionTopics, db.skills, db.milestones, db.focusGardens, db.focusSessions], async () => {
     const installation = await db.settings.get('installationId')
     const syncAccount = await db.settings.get('syncAccountId')
     const cloudEnabled = await db.settings.get('cloudEnabled')
@@ -438,7 +442,8 @@ export async function importAll(bundle: ExportBundle, mode: ImportMode): Promise
         db.ink.clear(),
         db.revisionTopics.clear(),
         db.skills.clear(),
-        db.milestones.clear()
+        db.milestones.clear(),
+        ...(bundle.version === 5 ? [db.focusGardens.clear(), db.focusSessions.clear()] : [])
       ])
     }
     await db.days.bulkPut(bundle.days)
@@ -450,6 +455,8 @@ export async function importAll(bundle: ExportBundle, mode: ImportMode): Promise
     if (bundle.revisionTopics) await db.revisionTopics.bulkPut(bundle.revisionTopics)
     if (bundle.skills) await db.skills.bulkPut(bundle.skills)
     if (bundle.milestones) await db.milestones.bulkPut(bundle.milestones)
+    if (bundle.focusGardens) await db.focusGardens.bulkPut(bundle.focusGardens)
+    if (bundle.focusSessions) await db.focusSessions.bulkPut(bundle.focusSessions)
     if (bundle.settings) await db.settings.bulkPut(bundle.settings.filter(row => row.key !== 'lastExportAt' && row.key !== 'installationId' && row.key !== 'syncAccountId' && row.key !== 'cloudEnabled'))
     await db.settings.put({ key: 'seeded', value: true })
     if (installation) await db.settings.put(installation)
