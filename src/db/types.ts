@@ -24,6 +24,9 @@ export interface InkStroke { id: string; color: string; size: number; points: In
 export interface InkPage { id: string; strokes: InkStroke[]; paper?: 'plain' | 'ruled' | 'grid' | 'dots' }
 export interface InkDocument { date: string; pages: InkPage[]; updatedAt: number }
 
+export interface FocusGarden { id: string; generation: string; seed: number; createdAt: number; updatedAt: number }
+export interface FocusSession { id: string; gardenId: string; elapsedMs: number; createdAt: number; updatedAt: number }
+
 export interface Task {
   id: string
   date: string

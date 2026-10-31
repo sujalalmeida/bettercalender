@@ -1,10 +1,21 @@
 import Dexie, { type Table } from 'dexie'
-import type { Category, Day, InkDocument, Milestone, Recurrence, RevisionTopic, SettingsRow, SkillEntry, Task, Template } from './types'
+import type { Category, Day, FocusGarden, FocusSession, InkDocument, Milestone, Recurrence, RevisionTopic, SettingsRow, SkillEntry, Task, Template } from './types'
 import { personalFeature } from '../personal/feature'
+import { existingExtraStores } from './preserveStores'
 
 export interface SyncChange { key: string; collection: string; id: string; revision: string }
 
 export class PlanDatabase extends Dexie {
+  private openingRequest: ReturnType<Dexie['open']> | undefined
+  override open(): ReturnType<Dexie['open']> {
+    if (this.isOpen()) return Dexie.Promise.resolve(this)
+    if (this.openingRequest) return this.openingRequest
+    this.openingRequest = Dexie.Promise.resolve(existingExtraStores(this.name, new Set(this.tables.map(t => t.name)))).then(stores => {
+      if (Object.keys(stores).length) this.version(1).stores(stores)
+      return super.open()
+    }).finally(() => { this.openingRequest = undefined })
+    return this.openingRequest
+  }
   days!: Table<Day, string>
   ink!: Table<InkDocument, string>
   tasks!: Table<Task, string>
@@ -16,6 +27,8 @@ export class PlanDatabase extends Dexie {
   revisionTopics!: Table<RevisionTopic, string>
   skills!: Table<SkillEntry, string>
   milestones!: Table<Milestone, string>
+  focusGardens!: Table<FocusGarden, string>
+  focusSessions!: Table<FocusSession, string>
 
   constructor() {
     super('plan-db')
@@ -44,6 +57,7 @@ export class PlanDatabase extends Dexie {
     })
 
     this.version(5).stores(personalFeature.databaseStores)
+    this.version(6).stores({ focusGardens: '&id, updatedAt', focusSessions: '&id, gardenId, updatedAt' })
 
     // Example migration for future changes (bumping version adds an index
     // without touching existing rows, so her data is preserved):
