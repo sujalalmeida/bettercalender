@@ -1,54 +1,87 @@
-import { render } from 'preact'
-import { App } from './App'
-import { personalFeature } from './personal/feature'
-import { ensureSeedData } from './db/db'
-import { db } from './db/db'
-import { createId } from './lib/id'
-import { initPWAUpdate } from './lib/pwaUpdate'
-import { installSyncTracking } from './lib/syncQueue'
-import './styles/global.css'
-import './styles/app.css'
+import { render } from "preact";
+import { App } from "./App";
+import { personalFeature } from "./personal/feature";
+import { ensureSeedData } from "./db/db";
+import { db } from "./db/db";
+import { createId } from "./lib/id";
+import { initPWAUpdate } from "./lib/pwaUpdate";
+import { installSyncTracking } from "./lib/syncQueue";
+import "./styles/global.css";
+import "./styles/app.css";
 
-initPWAUpdate()
+initPWAUpdate();
 
-const root = document.getElementById('app')!
+const root = document.getElementById("app")!;
 
 async function start() {
   try {
-    await db.open()
-    const hadDatabase = localStorage.getItem('plan.installation-id')
-    const installation = await db.settings.get('installationId')
-    const dataMissing = Boolean(hadDatabase && !installation)
+    await db.open();
+    const hadDatabase = localStorage.getItem("plan.installation-id");
+    const installation = await db.settings.get("installationId");
+    const dataMissing = Boolean(hadDatabase && !installation);
     if (!installation) {
-      const id = createId()
-      await db.settings.put({ key: 'installationId', value: id })
-      localStorage.setItem('plan.installation-id', id)
+      const id = createId();
+      await db.settings.put({ key: "installationId", value: id });
+      localStorage.setItem("plan.installation-id", id);
     } else {
-      localStorage.setItem('plan.installation-id', String(installation.value))
+      localStorage.setItem("plan.installation-id", String(installation.value));
     }
-    await ensureSeedData()
-    installSyncTracking()
-    let storageDenied = false
+    await ensureSeedData();
+    installSyncTracking();
+    let storageDenied = false;
     if (navigator.storage?.persist) {
-      const persisted = await navigator.storage.persisted()
-      if (!persisted) storageDenied = !(await navigator.storage.persist())
+      const persisted = await navigator.storage.persisted();
+      if (!persisted) storageDenied = !(await navigator.storage.persist());
     }
-    if (personalFeature.launch && personalFeature.loadPage && new URLSearchParams(window.location.search).get(personalFeature.launch.query) === '1') {
-      const PersonalPage = await personalFeature.loadPage()
-      render(<PersonalPage />, root)
-    } else render(<App initialStorageNotice={dataMissing ? 'Your saved data may have been cleared by this device. Import your latest backup in Settings to restore it.' : storageDenied && !localStorage.getItem('plan.storage-explained') ? 'This device could not guarantee permanent storage. Please export a backup regularly in Settings.' : null} />, root)
+    if (new URLSearchParams(window.location.search).get("focus") === "1") {
+      const { FocusMode } = await import("./components/FocusMode");
+      render(<FocusMode />, root);
+    } else if (
+      personalFeature.launch &&
+      personalFeature.loadPage &&
+      new URLSearchParams(window.location.search).get(
+        personalFeature.launch.query,
+      ) === "1"
+    ) {
+      const PersonalPage = await personalFeature.loadPage();
+      render(<PersonalPage />, root);
+    } else
+      render(
+        <App
+          initialStorageNotice={
+            dataMissing
+              ? "Your saved data may have been cleared by this device. Import your latest backup in Settings to restore it."
+              : storageDenied && !localStorage.getItem("plan.storage-explained")
+                ? "This device could not guarantee permanent storage. Please export a backup regularly in Settings."
+                : null
+          }
+        />,
+        root,
+      );
     // Restore persisted Firebase sessions even if the local sync preference is missing.
-    const loadCloud = () => { void import('./lib/cloudSync').then(module => module.startCloudSync()).catch(error => console.error('Could not start cloud sync', error)) }
-    if ('requestIdleCallback' in window) window.requestIdleCallback(loadCloud, { timeout: 2000 })
-    else setTimeout(loadCloud, 500)
-    if (storageDenied) localStorage.setItem('plan.storage-explained', '1')
+    const loadCloud = () => {
+      void import("./lib/cloudSync")
+        .then((module) => module.startCloudSync())
+        .catch((error) => console.error("Could not start cloud sync", error));
+    };
+    if ("requestIdleCallback" in window)
+      window.requestIdleCallback(loadCloud, { timeout: 2000 });
+    else setTimeout(loadCloud, 500);
+    if (storageDenied) localStorage.setItem("plan.storage-explained", "1");
   } catch (error) {
-    console.error('Could not open Plan', error)
-    render(<div class="startup-error"><h1>Plan could not open</h1><p>Your device storage is temporarily unavailable. Try closing and reopening the app.</p><button onClick={() => location.reload()}>Try again</button></div>, root)
+    console.error("Could not open Plan", error);
+    render(
+      <div class="startup-error">
+        <h1>Plan could not open</h1>
+        <p>
+          Your device storage is temporarily unavailable. Try closing and
+          reopening the app.
+        </p>
+        <button onClick={() => location.reload()}>Try again</button>
+      </div>,
+      root,
+    );
   }
 }
 
-if (new URLSearchParams(window.location.search).get('focus') === '1') {
-  void import('./components/FocusMode').then(({ FocusMode }) => render(<FocusMode />, root))
-}
-else void start()
+void start();

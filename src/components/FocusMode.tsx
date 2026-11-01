@@ -1,175 +1,664 @@
-import { useEffect, useState } from 'preact/hooks'
-import { EMPTY_FOCUS_TIMER, FOCUS_STORAGE_KEY, focusElapsed, formatFocusTime, parseFocusTimer, pauseFocus, startFocus, type FocusTimerState } from '../lib/focusTimer'
-import '../styles/focus.css'
+import { liveQuery } from "dexie";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { db } from "../db/db";
+import {
+  ensureFocusGarden,
+  restartFocusGarden,
+  saveFocusSession,
+} from "../db/focusRepository";
+import {
+  focusElapsed,
+  formatFocusTime,
+  pauseFocus,
+  startFocus,
+} from "../lib/focusTimer";
+import {
+  GARDEN_CLOCK_KEY,
+  GARDEN_MILESTONES,
+  gardenElapsed,
+  gardenStage,
+  legacyGardenCredit,
+  newClock,
+  parseGardenClock,
+  type GardenClock,
+} from "../lib/gardenState";
+import { useObservable } from "../lib/useObservable";
+import { gardenViewBox } from "../lib/gardenCamera";
+import { GardenLandscape } from "./GardenLandscape";
+import { UpdateToast } from "./UpdateToast";
+import "../styles/focus.css";
 
-type FlowerKind = 'white rose' | 'red rose' | 'lily'
-type Flower = { x: number; y: number; height: number; kind: FlowerKind; seedAt: number }
-const BLOOM_MS = 35_000
-
-const FLOWERS: Flower[] = Array.from({ length: 38 }, (_, index) => ({
-  x: 82 + ((index * 233) % 830),
-  y: 352 + ((index * 109) % 148),
-  height: 64 + ((index * 31) % 38),
-  kind: (['lily', 'white rose', 'red rose'] as FlowerKind[])[index % 3],
-  seedAt: index === 0 ? 0 : index === 1 ? 25_000 : index === 2 ? 50_000 : 50_000 + (index - 2) * 150_000
-})).sort((a, b) => a.y - b.y)
-
-const clamp = (value: number) => Math.max(0, Math.min(1, value))
-
-function Rose({ red }: { red: boolean }) {
-  const petal = red ? '#c95055' : '#f2f0e8'
-  const edge = red ? '#9d343f' : '#c8c9bd'
-  const inner = red ? '#a93c47' : '#d8d9cb'
-  return <g>
-    <ellipse cx="-12" cy="0" rx="13" ry="17" fill={petal} stroke={edge} strokeWidth="1.5" transform="rotate(-26 -12 0)" />
-    <ellipse cx="12" cy="0" rx="13" ry="17" fill={petal} stroke={edge} strokeWidth="1.5" transform="rotate(26 12 0)" />
-    <ellipse cx="0" cy="-9" rx="14" ry="16" fill={petal} stroke={edge} strokeWidth="1.5" />
-    <ellipse cx="0" cy="8" rx="13" ry="11" fill={inner} stroke={edge} strokeWidth="1.5" />
-    <path d="M-7 5 C-4 -3 9 -4 8 4 C7 10 -3 11 -3 5 C-3 1 3 1 3 5" fill="none" stroke={edge} strokeWidth="2" strokeLinecap="round" />
-  </g>
+function readClock(): GardenClock | null {
+  try {
+    return parseGardenClock(localStorage.getItem(GARDEN_CLOCK_KEY));
+  } catch {
+    return null;
+  }
 }
-
-function Lily() {
-  return <g>
-    <path d="M0 1 Q-8 -11 -8 -29 Q0 -25 4 -10 Z" fill="#f4f0e5" stroke="#d7d6c5" strokeWidth="1.5" />
-    <path d="M1 2 Q7 -15 17 -23 Q17 -11 8 -2 Z" fill="#faf6eb" stroke="#d7d6c5" strokeWidth="1.5" />
-    <path d="M1 3 Q18 -5 26 2 Q16 9 6 8 Z" fill="#f0ede2" stroke="#d7d6c5" strokeWidth="1.5" />
-    <path d="M0 4 Q-13 1 -24 8 Q-14 16 -3 9 Z" fill="#faf6eb" stroke="#d7d6c5" strokeWidth="1.5" />
-    <path d="M0 2 Q-19 -8 -22 -19 Q-9 -19 3 -5 Z" fill="#f0ede2" stroke="#d7d6c5" strokeWidth="1.5" />
-    <path d="M1 3 Q6 15 0 25 Q-8 16 -5 6 Z" fill="#f4f0e5" stroke="#d7d6c5" strokeWidth="1.5" />
-    <circle cy="2" r="5" fill="#d4ab55" />
-    <path d="M-3 1 L-6 -10 M2 0 L8 -8 M1 5 L11 10" stroke="#9b7d40" strokeWidth="1.6" strokeLinecap="round" />
-  </g>
+async function waitForCloudGarden(): Promise<void> {
+  const cloud = await import("../lib/cloudSync");
+  cloud.startCloudSync();
+  if (!cloud.getCloudState().configured) return;
+  if (!navigator.onLine)
+    throw new Error("Connect once to load your saved garden on this device.");
+  await new Promise<void>((resolve, reject) => {
+    let unsubscribe = () => {},
+      settled = false;
+    const timer = setTimeout(() => {
+      unsubscribe();
+      reject(
+        new Error(
+          "Your garden is taking longer to sync. Try again in a moment.",
+        ),
+      );
+    }, 22000);
+    const done = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      unsubscribe();
+      if (error) reject(error);
+      else resolve();
+    };
+    unsubscribe = cloud.subscribeCloudState((state) => {
+      if (
+        state.status === "Synced" ||
+        (!state.email && state.status.startsWith("Saved on this device"))
+      )
+        done();
+      else if (
+        state.status.includes("denied") ||
+        state.status.includes("Could not connect") ||
+        state.status.includes("Retrying")
+      )
+        done(
+          new Error(
+            "Could not load the cloud garden. Check sync in the planner, then try again.",
+          ),
+        );
+    });
+    if (settled) unsubscribe();
+  });
 }
-
-function GardenPlant({ flower, elapsedMs }: { flower: Flower; elapsedMs: number }) {
-  const progress = clamp((elapsedMs - flower.seedAt) / BLOOM_MS)
-  if (progress <= 0) return null
-  const stem = flower.height * clamp(.14 + progress * 1.7)
-  const bloom = clamp((progress - .42) / .58)
-  const depth = .8 + (flower.y - 352) / 540
-  return <g transform={`translate(${flower.x} ${flower.y}) scale(${depth})`}>
-    <ellipse cx="0" cy="3" rx="22" ry="7" fill="#153823" opacity=".55" />
-    <path d={`M0 0 Q${flower.x % 2 ? 9 : -9} -${stem * .5} 0 -${stem}`} fill="none" stroke="#70a675" strokeWidth="4" strokeLinecap="round" />
-    {progress > .3 && <g opacity={clamp((progress - .3) * 4)}>
-      <path d={`M2 -${stem * .44} Q21 -${stem * .7} 28 -${stem * .49} Q14 -${stem * .33} 2 -${stem * .44}`} fill="#5f9a67" />
-      <path d={`M-2 -${stem * .62} Q-23 -${stem * .84} -28 -${stem * .59} Q-15 -${stem * .46} -2 -${stem * .62}`} fill="#79ae76" />
-    </g>}
-    {bloom > 0 && <g transform={`translate(0 -${stem}) scale(${bloom})`} class="focus-flower-head">
-      {flower.kind === 'lily' ? <Lily /> : <Rose red={flower.kind === 'red rose'} />}
-    </g>}
-  </g>
-}
-
-function GardenScene({ elapsedMs, running }: { elapsedMs: number; running: boolean }) {
-  const growing = FLOWERS.filter(flower => elapsedMs > flower.seedAt).length
-  const bloomed = FLOWERS.filter(flower => elapsedMs >= flower.seedAt + BLOOM_MS).length
-  return <div class="focus-garden-scene">
-    <svg viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid meet" role="img" aria-label={`Green focus garden with ${bloomed} ${bloomed === 1 ? 'flower' : 'flowers'} in bloom and ${Math.max(0, growing - bloomed)} growing`}>
-      <rect width="1000" height="560" fill="#173b29" />
-      <path d="M0 205 Q150 157 290 199 T590 190 T1000 174 L1000 560 L0 560 Z" fill="#20482f" />
-      <path d="M0 305 Q200 263 415 300 T1000 265 L1000 560 L0 560 Z" fill="#285438" />
-      <path d="M0 445 Q190 402 400 443 T1000 401 L1000 560 L0 560 Z" fill="#315f3d" />
-      {Array.from({ length: 82 }, (_, index) => {
-        const x = (index * 137) % 1000
-        const y = 310 + ((index * 73) % 245)
-        return <path key={index} d={`M${x} ${y} l-3 -8 M${x} ${y} l4 -10`} fill="none" stroke={index % 3 ? '#4e8054' : '#6b9a61'} strokeWidth="1.4" opacity=".55" />
-      })}
-      {FLOWERS.map((flower, index) => <GardenPlant key={index} flower={flower} elapsedMs={elapsedMs} />)}
-    </svg>
-    {running && <span class="focus-garden-live"><span /> GROWING</span>}
-  </div>
-}
-
-function readSavedTimer(): FocusTimerState {
-  try { return parseFocusTimer(localStorage.getItem(FOCUS_STORAGE_KEY)) }
-  catch { return { ...EMPTY_FOCUS_TIMER } }
-}
-
-function saveTimer(state: FocusTimerState): void {
-  try { localStorage.setItem(FOCUS_STORAGE_KEY, JSON.stringify(state)) }
-  catch { /* Timer still works in memory if storage is unavailable. */ }
-}
-
 export function FocusMode() {
-  const plannerUrl = new URL(window.location.href)
-  plannerUrl.searchParams.delete('focus')
-  const [timer, setTimer] = useState(readSavedTimer)
-  const [now, setNow] = useState(Date.now())
-  const elapsedMs = focusElapsed(timer, now)
-  const running = timer.startedAt !== null
-  const bloomed = FLOWERS.filter(flower => elapsedMs >= flower.seedAt + BLOOM_MS).length
-  const nextSeed = FLOWERS.filter(flower => flower.seedAt > elapsedMs).sort((a, b) => a.seedAt - b.seedAt)[0]
-
+  const garden = useObservable(
+    () => liveQuery(() => db.focusGardens.get("main")),
+    [],
+    undefined,
+  );
+  const sessions = useObservable(
+    () => liveQuery(() => db.focusSessions.toArray()),
+    [],
+    [],
+  );
+  const [clock, setClock] = useState<GardenClock | null>(readClock),
+    clockRef = useRef(clock);
+  clockRef.current = clock;
+  const [now, setNow] = useState(Date.now()),
+    [ready, setReady] = useState(false),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState("");
+  const [actionBusy, setActionBusy] = useState(false),
+    [restartConfirm, setRestartConfirm] = useState(false);
+  const [immersive, setImmersive] = useState(false),
+    [hiddenControls, setHiddenControls] = useState(false);
+  const [motion, setMotion] = useState(
+    () => !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  const [preview, setPreview] = useState<number | null>(null);
+  const root = useRef<HTMLDivElement>(null),
+    scene = useRef<HTMLDivElement>(null),
+    camera = useRef(0.5),
+    cameraSize = useRef({ width: 1600, height: 1000 }),
+    cameraDrag = useRef<{ id: number; x: number; position: number } | null>(
+      null,
+    );
+  function moveCamera(position: number) {
+    camera.current = Math.max(0, Math.min(1, position));
+    const { width, height } = cameraSize.current;
+    scene.current
+      ?.querySelector("svg")
+      ?.setAttribute(
+        "viewBox",
+        gardenViewBox(width, height, camera.current).join(" "),
+      );
+  }
   useEffect(() => {
-    const previousTitle = document.title
-    document.title = 'Focus Garden · Plan'
-    return () => { document.title = previousTitle }
-  }, [])
-
+    if (!scene.current) return;
+    const observer = new ResizeObserver(() => {
+      cameraSize.current = {
+        width: scene.current!.clientWidth,
+        height: scene.current!.clientHeight,
+      };
+      moveCamera(camera.current);
+    });
+    observer.observe(scene.current);
+    return () => observer.disconnect();
+  }, []);
+  function cameraDown(event: PointerEvent) {
+    if (
+      (event.target as Element).closest("button") ||
+      (event.pointerType === "mouse" && event.button !== 0)
+    )
+      return;
+    cameraDrag.current = {
+      id: event.pointerId,
+      x: event.clientX,
+      position: camera.current,
+    };
+    scene.current?.setPointerCapture(event.pointerId);
+  }
+  function cameraMove(event: PointerEvent) {
+    const drag = cameraDrag.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    const { width, height } = cameraSize.current,
+      view = gardenViewBox(width, height, camera.current);
+    if (view[2] >= 1600) return;
+    const delta = event.clientX - drag.x;
+    if (Math.abs(delta) > 5) {
+      event.preventDefault();
+      moveCamera(
+        drag.position - ((delta / width) * view[2]) / (1600 - view[2]),
+      );
+    }
+  }
+  function cameraUp(event: PointerEvent) {
+    cameraDrag.current = null;
+    if (scene.current?.hasPointerCapture(event.pointerId))
+      scene.current.releasePointerCapture(event.pointerId);
+  }
+  const total = garden ? gardenElapsed(garden, sessions, clock, now) : 0;
+  const displayed = clock
+    ? clock.displayOffsetMs + focusElapsed(clock.timer, now)
+    : 0;
+  const running = clock?.timer.startedAt !== null && clock !== null;
+  const stage = gardenStage(total),
+    viewMs = preview ?? total,
+    viewStage = gardenStage(viewMs);
+  const valid = ready && !!garden && clock?.gardenId === garden.generation;
+  const plannerUrl = new URL(window.location.href);
+  plannerUrl.searchParams.delete("focus");
+  function commit(next: GardenClock) {
+    clockRef.current = next;
+    setClock(next);
+    setNow(Date.now());
+    try {
+      localStorage.setItem(GARDEN_CLOCK_KEY, JSON.stringify(next));
+    } catch {
+      setNotice(
+        "The timer could not be remembered by this browser. Keep this window open.",
+      );
+    }
+  }
+  async function boot() {
+    setError("");
+    try {
+      if (!(await db.focusGardens.get("main"))) await waitForCloudGarden();
+      const credit = (() => {
+        try {
+          return legacyGardenCredit(localStorage);
+        } catch {
+          return 0;
+        }
+      })();
+      await ensureFocusGarden(credit);
+      setReady(true);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not load the garden.",
+      );
+    }
+  }
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      const tick = Date.now()
-      setNow(tick)
-      if (timer.startedAt !== null) saveTimer({ ...timer, lastSeenAt: tick })
-    }, 1000)
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== FOCUS_STORAGE_KEY) return
-      const incoming = parseFocusTimer(event.newValue)
-      setTimer(current => current.startedAt === incoming.startedAt && current.elapsedMs === incoming.elapsedMs ? current : incoming)
-      setNow(Date.now())
-    }
-    const onPageHide = () => {
-      if (timer.startedAt !== null) saveTimer(pauseFocus(timer, Date.now()))
-    }
-    window.addEventListener('storage', onStorage)
-    window.addEventListener('pagehide', onPageHide)
+    void boot();
+    const title = document.title;
+    document.title = "Focus Garden · Plan";
     return () => {
-      window.clearInterval(interval)
-      window.removeEventListener('storage', onStorage)
-      window.removeEventListener('pagehide', onPageHide)
+      document.title = title;
+    };
+  }, []);
+  useEffect(() => {
+    if (!ready || !garden || clockRef.current?.gardenId === garden.generation)
+      return;
+    let cancelled = false;
+    const previous = clockRef.current;
+    void (async () => {
+      if (previous) await saveFocusSession(previous);
+      if (cancelled) return;
+      const next = newClock(garden.generation);
+      if (previous) {
+        next.displayOffsetMs =
+          previous.displayOffsetMs + focusElapsed(previous.timer);
+        if (previous.timer.startedAt !== null)
+          next.timer = startFocus(next.timer);
+      }
+      commit(next);
+    })().catch(() =>
+      setError(
+        "Could not restore the stopwatch. Your saved garden is still here.",
+      ),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, garden?.generation]);
+  useEffect(() => {
+    const tick = window.setInterval(() => setNow(Date.now()), 1000);
+    const persist = () => {
+      const current = clockRef.current;
+      if (current)
+        void saveFocusSession(current).catch(() =>
+          setNotice(
+            "Garden progress is waiting to save. Keep this window open and try again.",
+          ),
+        );
+    };
+    const heartbeat = window.setInterval(persist, 10000);
+    const resume = () => {
+      setNow(Date.now());
+      persist();
+    };
+    const storage = (event: StorageEvent) => {
+      if (event.key !== GARDEN_CLOCK_KEY) return;
+      const next = parseGardenClock(event.newValue);
+      if (next) {
+        clockRef.current = next;
+        setClock(next);
+        setNow(Date.now());
+      }
+    };
+    window.addEventListener("storage", storage);
+    window.addEventListener("pagehide", persist);
+    window.addEventListener("pageshow", resume);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      clearInterval(tick);
+      clearInterval(heartbeat);
+      persist();
+      window.removeEventListener("storage", storage);
+      window.removeEventListener("pagehide", persist);
+      window.removeEventListener("pageshow", resume);
+      document.removeEventListener("visibilitychange", resume);
+    };
+  }, []);
+  useEffect(() => {
+    const full = () => {
+      if (!document.fullscreenElement) setImmersive(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setImmersive(false);
+        setHiddenControls(false);
+        setPreview(null);
+        setRestartConfirm(false);
+      }
+    };
+    document.addEventListener("fullscreenchange", full);
+    window.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("fullscreenchange", full);
+      window.removeEventListener("keydown", escape);
+    };
+  }, []);
+  async function toggleFocus() {
+    if (!clockRef.current || !valid) return;
+    const current = clockRef.current;
+    const next = {
+      ...current,
+      timer:
+        current.timer.startedAt !== null
+          ? pauseFocus(current.timer)
+          : startFocus(current.timer),
+    };
+    commit(next);
+    try {
+      await saveFocusSession(next);
+      setNotice("");
+    } catch {
+      setNotice(
+        "Session time is kept in this browser. Garden save will retry.",
+      );
     }
-  }, [timer])
-
-  function update(next: FocusTimerState) {
-    saveTimer(next)
-    setTimer(next)
-    setNow(Date.now())
   }
-
-  function resetGarden() {
-    if (elapsedMs > 0 && !window.confirm('Start a new garden? This clears the current stopwatch and flowers.')) return
-    update({ ...EMPTY_FOCUS_TIMER })
+  async function resetStopwatch() {
+    if (!clockRef.current || !garden) return;
+    setActionBusy(true);
+    try {
+      await saveFocusSession(clockRef.current);
+      commit(newClock(garden.generation));
+      setNotice(
+        "Stopwatch reset. Your garden keeps growing from its saved progress.",
+      );
+    } catch {
+      setError(
+        "Could not save this session. Try again before resetting the stopwatch.",
+      );
+    } finally {
+      setActionBusy(false);
+    }
   }
-
-  return <div class="focus-shell">
-    <header class="focus-header">
-      <span class="focus-brand"><span>P</span> PLAN / FOCUS</span>
-      <a href={plannerUrl.toString()} class="focus-return">Back to planner <span aria-hidden="true">↗</span></a>
-    </header>
-    <main class="focus-layout">
-      <section class="focus-control-panel" aria-label="Focus stopwatch">
-        <div class="focus-intro">
-          <span class="focus-eyebrow">FOCUS</span>
-          <h1>FOCUS.</h1>
+  async function restartGarden() {
+    if (!clockRef.current || !garden) return;
+    setActionBusy(true);
+    try {
+      const old = clockRef.current;
+      await saveFocusSession(old);
+      const nextGarden = await restartFocusGarden(garden);
+      const next = newClock(nextGarden.generation);
+      next.displayOffsetMs = old.displayOffsetMs + focusElapsed(old.timer);
+      if (old.timer.startedAt !== null) next.timer = startFocus(next.timer);
+      commit(next);
+      setRestartConfirm(false);
+      setPreview(null);
+      setNotice(
+        "A new garden has started. Your stopwatch and study history are kept.",
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not restart the garden.",
+      );
+    } finally {
+      setActionBusy(false);
+    }
+  }
+  async function toggleFullscreen() {
+    if (immersive) {
+      setImmersive(false);
+      setHiddenControls(false);
+      if (document.fullscreenElement)
+        await document.exitFullscreen().catch(() => undefined);
+    } else {
+      setImmersive(true);
+      try {
+        await root.current?.requestFullscreen?.();
+      } catch {
+        /* The expanded page also works in iPad browsers without Fullscreen API support. */
+      }
+    }
+  }
+  const landscape = useMemo(
+    () => (
+      <GardenLandscape
+        elapsedMs={Math.floor(viewMs / 10000) * 10000}
+        seed={garden?.seed ?? 1}
+        motion={motion}
+      />
+    ),
+    [Math.floor(viewMs / 10000), garden?.seed, motion],
+  );
+  return (
+    <div
+      class={`focus-shell ${immersive ? "focus-immersive" : ""} ${hiddenControls ? "focus-controls-hidden" : ""}`}
+      ref={root}
+    >
+      <header class="focus-header">
+        <a class="focus-return" href={plannerUrl.toString()}>
+          ← Plan
+        </a>
+        <div class="focus-brand">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 21V9M12 15C1 16 2 3 11 10M12 12C23 13 23 0 13 7"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            />
+          </svg>
+          Focus garden
         </div>
-        <div class="focus-clock-stack">
-          <div class="focus-clock-card">
-            <div class="focus-clock-top"><span>FOCUS TIME</span><span class={running ? 'focus-status is-running' : 'focus-status'}><i />{running ? 'IN PROGRESS' : elapsedMs > 0 ? 'PAUSED' : 'READY'}</span></div>
-            <div class="focus-clock" role="timer" aria-label={`Focused for ${formatFocusTime(elapsedMs)}`}>{formatFocusTime(elapsedMs)}</div>
-            <div class="focus-clock-actions">
-              <button class="focus-main-action" onClick={() => update(running ? pauseFocus(timer, Date.now()) : startFocus(timer, Date.now()))}>{running ? 'Pause focus' : elapsedMs > 0 ? 'Continue focusing' : 'Start focusing'} <span aria-hidden="true">{running ? 'Ⅱ' : '→'}</span></button>
-              <button class="focus-reset" onClick={resetGarden} disabled={elapsedMs === 0}>New garden</button>
+        <button
+          class="focus-text-action"
+          onClick={() => {
+            void toggleFullscreen();
+          }}
+        >
+          {immersive ? "Exit full screen" : "Full screen"} ↗
+        </button>
+      </header>
+      <main class="focus-layout">
+        <div class="focus-landscape-heading">
+          <div>
+            <span class="focus-eyebrow">YOUR GROWING WORLD</span>
+            <h1>
+              {preview !== null ? "A glimpse ahead." : "A place to grow."}
+            </h1>
+          </div>
+          <div class="focus-season">
+            <span>{viewStage.season}</span>
+            <i />
+            {viewStage.phase}
+          </div>
+        </div>
+        <section
+          class="focus-garden-panel"
+          aria-label="Persistent study garden"
+        >
+          <div
+            class="focus-garden-scene"
+            ref={scene}
+            onPointerDown={cameraDown}
+            onPointerMove={cameraMove}
+            onPointerUp={cameraUp}
+            onPointerCancel={cameraUp}
+          >
+            {landscape}
+            <div class="focus-scene-badges">
+              <span>
+                {preview !== null
+                  ? "Landscape preview"
+                  : running
+                    ? "Growing with you"
+                    : "Your saved garden"}
+              </span>
+              {preview !== null && (
+                <button onClick={() => setPreview(null)}>
+                  Return to garden
+                </button>
+              )}
+            </div>
+            <div class="focus-camera-controls">
+              <button
+                aria-label="View left side of garden"
+                onClick={() => moveCamera(camera.current - 0.3)}
+              >
+                ←
+              </button>
+              <span>Explore</span>
+              <button
+                aria-label="View right side of garden"
+                onClick={() => moveCamera(camera.current + 0.3)}
+              >
+                →
+              </button>
+            </div>
+            {immersive && (
+              <div class="focus-scene-controls">
+                <button
+                  class="focus-show-controls"
+                  onClick={() => setHiddenControls(!hiddenControls)}
+                  aria-label={
+                    hiddenControls
+                      ? "Show garden controls"
+                      : "Hide garden controls"
+                  }
+                >
+                  {hiddenControls ? "Show controls" : "Hide controls"}
+                </button>
+                <button
+                  class="focus-exit"
+                  onClick={() => {
+                    void toggleFullscreen();
+                  }}
+                >
+                  Exit ↙
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+        <section class="focus-control-panel" aria-label="Focus stopwatch">
+          <div class="focus-time-group">
+            <span class="focus-eyebrow">THIS SESSION</span>
+            <div
+              class="focus-clock"
+              role="timer"
+              aria-label={`Focused for ${formatFocusTime(displayed)}`}
+            >
+              {formatFocusTime(displayed)}
+            </div>
+            <span class="focus-timer-state">
+              {running
+                ? "Running · continues in the background"
+                : displayed
+                  ? "Paused"
+                  : "Ready when you are"}
+            </span>
+          </div>
+          <div class="focus-clock-actions">
+            <button
+              class="focus-main-action"
+              disabled={!valid || actionBusy}
+              onClick={() => {
+                void toggleFocus();
+              }}
+            >
+              {running
+                ? "Pause focus"
+                : displayed
+                  ? "Continue focusing"
+                  : "Start focusing"}{" "}
+              <span aria-hidden="true">{running ? "Ⅱ" : "→"}</span>
+            </button>
+            <button
+              class="focus-reset"
+              disabled={!valid || !displayed || actionBusy}
+              onClick={() => {
+                void resetStopwatch();
+              }}
+            >
+              Reset stopwatch
+            </button>
+          </div>
+          <div class="focus-garden-stats">
+            <div>
+              <strong>
+                {Math.floor(total / 3600000)}
+                <small>h</small> {Math.floor(total / 60000) % 60}
+                <small>m</small>
+              </strong>
+              <span>Garden time</span>
+            </div>
+            <div>
+              <strong>{stage.flowers.toLocaleString()}</strong>
+              <span>Blooms grown</span>
             </div>
           </div>
-          <div class="focus-progress-note"><span>{bloomed} {bloomed === 1 ? 'flower' : 'flowers'} in bloom</span><span>{nextSeed ? `Next seed in ${Math.max(1, Math.ceil((nextSeed.seedAt - elapsedMs) / 60_000))} min` : 'Garden in full bloom'}</span></div>
-        </div>
-      </section>
-      <section class="focus-garden-panel" aria-label="Growing focus garden">
-        <div class="focus-garden-top"><span>THE GARDEN</span><span>WHITE ROSES / RED ROSES / LILIES</span></div>
-        <GardenScene elapsedMs={elapsedMs} running={running} />
-        <div class="focus-garden-bottom"><span>01 / GROWTH</span></div>
-      </section>
-    </main>
-  </div>
+        </section>
+        {error && (
+          <div class="focus-notice has-error" role="alert">
+            {error}
+            {!ready && (
+              <button
+                onClick={() => {
+                  void boot();
+                }}
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        )}
+        {notice && (
+          <p class="focus-notice" role="status">
+            {notice}
+          </p>
+        )}
+        <footer class="focus-garden-footer">
+          <div class="focus-next">
+            <span class="focus-eyebrow">
+              {stage.next ? "NEXT IN YOUR GARDEN" : "A GARDEN FOR EVERY SEASON"}
+            </span>
+            <span>
+              {stage.next
+                ? `${stage.next.label} · ${Math.ceil(stage.next.minutes - stage.minutes)} min to go`
+                : "New blooms, changing seasons, and another day in your little world."}
+            </span>
+          </div>
+          <div class="focus-footer-actions">
+            <button aria-pressed={!motion} onClick={() => setMotion(!motion)}>
+              {motion ? "Still scene" : "Gentle motion"}
+            </button>
+            <details class="focus-roadmap">
+              <summary>Explore growth</summary>
+              <div>
+                <p>Preview only · your saved garden stays the same.</p>
+                <div>
+                  {[0, 45, 120, 360, 660, 720, 1440, 2880].map((minute) => (
+                    <button
+                      aria-pressed={preview === minute * 60000}
+                      onClick={() => setPreview(minute * 60000)}
+                    >
+                      {minute === 660
+                        ? "Night garden"
+                        : minute === 0
+                          ? "New"
+                          : minute < 60
+                            ? `${minute} min`
+                            : `${minute / 60} hours`}
+                    </button>
+                  ))}
+                </div>
+                <ul>
+                  {GARDEN_MILESTONES.map((m) => (
+                    <li class={stage.minutes >= m.minutes ? "is-earned" : ""}>
+                      <span>
+                        {m.minutes < 60
+                          ? `${m.minutes}m`
+                          : `${m.minutes / 60}h`}
+                      </span>
+                      {m.label}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </details>
+            <button
+              onClick={() => setRestartConfirm(true)}
+              disabled={!valid || actionBusy}
+            >
+              Restart the Garden
+            </button>
+          </div>
+        </footer>
+        {restartConfirm && (
+          <section
+            class="focus-restart-confirm"
+            role="region"
+            aria-label="Restart garden confirmation"
+          >
+            <h2>Start a new garden?</h2>
+            <p>
+              This removes the current landscape. Your stopwatch and saved study
+              sessions stay.
+            </p>
+            <div>
+              <button onClick={() => setRestartConfirm(false)}>
+                Keep my garden
+              </button>
+              <button
+                class="focus-main-action"
+                disabled={actionBusy}
+                onClick={() => {
+                  void restartGarden();
+                }}
+              >
+                Restart the Garden
+              </button>
+            </div>
+          </section>
+        )}
+      </main>
+      <UpdateToast />
+    </div>
+  );
 }
