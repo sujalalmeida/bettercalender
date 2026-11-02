@@ -19,3 +19,11 @@
 ## Verification and delivery
 
 Meaningful tests for geometry, stroke editing, legacy backups, prediction exclusion, save boundaries, persistence/migration, timer reset vs garden reset, background elapsed time and cloud sync. Browser-check iPad/phone/desktop layouts, exports, full screen and state recovery. Build/test both personal and public-only checkouts. Inspect staged files for ignored sources or secrets. Push coherent commits with lowercase messages of three to six words, using real timestamps.
+
+## Verification record
+
+- Automated regression coverage includes partial erasing between sparse samples, crossing lasso selection, clamped transforms, layered rendering without repainting saved ink per sample, background timer recovery, idempotent session credit, explicit garden generations, legacy timer migration, version 5 backup validation, cloud garden/session upload, day/night continuity and portrait camera coverage.
+- Local browser checks use synthetic data with Firebase disabled: saved ink survives reopening; lasso tap/copy/paste/resize/undo and PNG output work; timer survives reload; pausing and resetting the stopwatch retains cumulative garden time. Responsive/fullscreen landscape checks and growth previews cover later garden stages.
+- Physical Apple Pencil latency, palm rejection and native iPad printing still need device acceptance testing. Signed-in live cross-device sync is covered at the queue/protocol layer, not asserted from a real two-device test.
+
+Final checks passed: 109 tests in the complete local edition, 82 tests in an isolated public-only checkout, both production builds, and `git diff --check`. The public checkout contains no ignored personal feature, environment files or personal-feature bundles. Browser checks covered saved ink, lasso editing, shapes, eraser undo, zoom, PNG export, tablet/phone notebook layout, portrait garden exploration, fullscreen entry/exit and hidden controls, stopwatch reset/reload persistence, and canceling garden restart.

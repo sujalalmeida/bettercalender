@@ -41,7 +41,7 @@ npm run test        # one-off run
 npm run test:watch  # watch mode
 ```
 
-Covers recurrence expansion, `.ics` generation, date-range queries (including the virtual/materialized recurrence merge), and backup-import validation.
+Covers calendar queries, recurrence, backups, offline sync recovery, ink editing/render layers, background timers, persistent garden generations, schema preservation and server request validation.
 
 ## Build
 
@@ -73,7 +73,7 @@ The app shows this same guidance itself the first time it's opened in mobile Saf
 
 ## Back up your data
 
-Settings → **Export JSON** downloads everything (typed notes, handwritten pages, tasks, recurrences, categories, templates, settings) as one file. **Import JSON** restores it, with a choice to merge into or replace existing data. Offline data remains in this browser's IndexedDB. After cloud sync is configured and she signs in, Firebase provides a second copy and cross-device access. Older version 1, 2 and 3 backups still import.
+Settings → **Export JSON** downloads everything (typed notes, handwritten pages, tasks, recurrences, categories, templates, settings) as one file. **Import JSON** restores it, with a choice to merge into or replace existing data. Offline data remains in this browser's IndexedDB. After cloud sync is configured and she signs in, Firebase provides a second copy and cross-device access. Older version 1–4 backups still import. Version 5 also includes garden metadata and study sessions.
 
 ## Daily timeline and refreshed design
 
@@ -81,11 +81,19 @@ The Today tab opens a daily timeline with a seven-day date strip, anytime and sc
 
 ## Focus Garden
 
-The **Focus** button opens a separate window with a stopwatch and a green garden. The garden starts empty, then grows lilies, white roses and red roses as focused time passes. Pause and continue the timer, or start a new garden. The current stopwatch is saved in this browser so a refresh keeps its time and flowers. Closing the focus window pauses the timer; focus progress is local to that browser and is not included in Firebase sync or JSON backups.
+The **Focus** button opens a separate study window. Its garden grows from cumulative study time, independently of the stopwatch: resetting the stopwatch, closing the window, or reloading does not clear the landscape. A running stopwatch continues until paused, including time spent in the background. **Restart the Garden** explicitly starts a new landscape after confirmation, while keeping the stopwatch and saved study sessions.
+
+White roses, red roses, lilies and meadow flowers grow and mature. A stream appears after 45 minutes; later stages add garden keepers, a footbridge, cottage construction, vegetable beds, a campfire, an orchard, a glasshouse, a windmill, a stone bridge and a cottage library. A three-hour day/night cycle gradually changes the light; seasons change every six accumulated study hours. Blooms keep accumulating beyond the first hour and day. Detailed plants are bounded for rendering performance, while the meadow becomes denser as totals grow.
+
+Use **Full screen** for the landscape view, hide the controls, and drag horizontally or use the arrow buttons to explore on narrow screens. **Explore growth** previews later landscapes without changing saved progress. **Still scene** and the device's reduced-motion setting stop decorative animation.
+
+Garden metadata and session contributions save in IndexedDB, participate in the existing signed-in Firebase sync, and are included in version 5 JSON backups. The active stopwatch is remembered on its browser; other devices receive saved garden progress. Concurrent windows on one browser share the same stopwatch and session ID, so periodic saves do not count that session twice. The previous timer's recorded study time is migrated once. No authentication session is reset by the upgrade.
 
 ## Apple Pencil on iPad
 
-Open a day. The Apple Pencil whiteboard is first and fills most of the opened day; typed Notes are below it. On iPad, the day opens as a large animated card over the month or week. The canvas supports pressure-sensitive ink, color and size choices, stroke erasing, undo/redo, multiple pages, and saving the current page as a PNG. Pencil strokes save automatically in IndexedDB and are included in sync and JSON backups. Fingers scroll the page by default; turn on **Draw with finger** to use a finger or a basic stylus as a pen. A mouse also draws for Mac testing.
+Open a day. The whiteboard appears first, with typed Notes below it. **Expand canvas** opens a larger writing workspace. The editor offers pressure-sensitive pen, tilt-aware pencil, translucent marker, partial-ink and whole-stroke erasers, lasso selection with move/copy/paste/resize/delete, a ruler, line/rectangle/ellipse tools, plain/ruled/grid/dotted paper, undo/redo, multiple pages, PNG export and multi-page Print/PDF.
+
+Saved ink, the active stroke and transient feedback use separate canvas layers. Writing collects real coalesced Pointer Events and smooths pressure-aware strokes; optional predicted events appear only as temporary feedback and are never stored. Fingers scroll by default; two fingers pan and zoom, and **Finger drawing** enables direct finger input. Pencil takes priority over touch. Zoom controls support 75–300%, and a mouse can draw for desktop testing. Ink saves automatically, flushes before closing the day, and stays in the existing sync and backup system. A failed save keeps the day open with a retry message.
 
 The ordinary Notes area, task field, and search field remain standard text controls, so iPadOS Scribble can turn Pencil handwriting there into typed text. The freehand page keeps writing as ink. Browser Pointer Events expose Pencil pressure and tilt on supported iPadOS versions; hardware-specific double-tap and squeeze gestures are not part of this web UI.
 
@@ -126,7 +134,8 @@ The first successful launch creates an installation marker. If browser storage i
 - [ ] Tap a day → expands smoothly; swipe down / tap backdrop / tap "Done" → collapses back to the same box.
 - [ ] On iPad, opening a day shows a large animated card with the whiteboard first and enough room to write.
 - [ ] Typing in Notes below the whiteboard never gets hidden behind the keyboard; the keyboard doesn't pop up just from expanding a day.
-- [ ] On iPad, use Apple Pencil to write in a day; test pressure changes, eraser, undo/redo, page changes, rotation, reopen, and JSON backup/import.
+- [ ] On a physical iPad, test Pencil pressure/tilt, palm rejection, rapid writing, both erasers, lasso editing, two-finger pan/zoom, shapes, undo/redo, rotation, reopen, PNG/PDF and JSON backup/import. Browser automation cannot measure hardware Pencil latency.
+- [ ] Pause/reset the stopwatch, reload Focus, and confirm garden time stays. Test fullscreen exit, background time, reduced motion and signed-in garden sync on two devices.
 - [ ] Try Scribble in Notes and Add a task; verify a finger scrolls the handwriting page until Draw with finger is enabled.
 - [ ] Turn on Airplane Mode, re-open the installed app — it opens instantly and everything still works.
 - [ ] Add to Home Screen from Safari; re-open from the Home Screen icon — no browser chrome, correct status bar style.
