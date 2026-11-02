@@ -62,7 +62,7 @@ describe("persistent garden clock", () => {
       gardenStage(12 * 3600000).flowers,
     );
     expect(gardenStage(6 * 3600000).season).toBe("Summer");
-    expect(gardenStage(18 * 3600000).season).toBe("Winter");
+    expect(gardenStage(18 * 3600000).season).toBe("Summer");
     expect(gardenStage(24 * 3600000).season).toBe("Spring");
     expect(gardenStage(100 * 3600000).detailedFlowers).toBeLessThanOrEqual(420);
   });

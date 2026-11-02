@@ -1,5 +1,6 @@
 import type { FocusGarden, FocusSession } from "../db/types";
 import { createId } from "./id";
+import { GARDEN_PROJECTS } from "./gardenGrowth";
 import {
   EMPTY_FOCUS_TIMER,
   FOCUS_STORAGE_KEY,
@@ -112,17 +113,14 @@ export const GARDEN_MILESTONES = [
   { minutes: 300, label: "A second cottage" },
   { minutes: 480, label: "A glasshouse" },
   { minutes: 600, label: "The old windmill" },
-  { minutes: 720, label: "An autumn garden" },
+  ...GARDEN_PROJECTS.map(({ minutes, label }) => ({ minutes, label })),
   { minutes: 960, label: "A stone bridge" },
-  { minutes: 1080, label: "Winter lights" },
   { minutes: 1440, label: "A cottage library" },
-] as const;
+].sort((a, b) => a.minutes - b.minutes);
 export function gardenStage(elapsedMs: number) {
   const minutes = Math.max(0, elapsedMs / STUDY_MINUTE),
     hours = minutes / 60;
-  const season = (["Spring", "Summer", "Autumn", "Winter"] as const)[
-    Math.floor(hours / 6) % 4
-  ];
+  const season = (["Spring", "Summer"] as const)[Math.floor(hours / 6) % 2];
   const dayProgress = (minutes % 180) / 180;
   const smooth = (n: number) => {
     const t = Math.max(0, Math.min(1, n));
