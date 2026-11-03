@@ -97,32 +97,32 @@ export function Flowers({
                     ? "#a7a0bd"
                     : "#dfb0ba";
         return (
-          <g transform={`translate(${p.x} ${p.y}) scale(${depth})`}>
+          <g key={p.i} transform={`translate(${p.x} ${p.y}) scale(${depth})`}>
             <ellipse cy="3" rx="12" ry="3" fill="#344c33" opacity=".15" />
-            <path
-              d={`M0 0Q${p.i % 2 ? 6 : -6} ${-h * 0.5} 0 ${-h}`}
-              fill="none"
-              stroke={"#367d42"}
-              stroke-width="2"
-            />
-            {p.growth > 0.3 && (
+            <g
+              class={p.i % 19 === 0 ? "garden-flower-sway" : ""}
+              style={{ "--sway-delay": `${-noise(p.i, seed) * 8}s` }}
+            >
               <path
-                d={`M0 ${-h * 0.35}Q16 ${-h * 0.7} 19 ${-h * 0.4}Q6 ${-h * 0.2} 0 ${-h * 0.35}M0 ${-h * 0.6}Q-15 ${-h * 0.9}-17 ${-h * 0.6}Q-5 ${-h * 0.4} 0 ${-h * 0.6}`}
-                fill={"#63a44c"}
+                d={`M0 0Q${p.i % 2 ? 6 : -6} ${-h * 0.5} 0 ${-h}`}
+                fill="none"
+                stroke={"#367d42"}
+                stroke-width="2"
               />
-            )}
-            {p.growth > 0.5 && (
-              <g
-                class={p.i % 19 === 0 ? "garden-flower-sway" : ""}
-                style={{ "--sway-delay": `${-noise(p.i, seed) * 8}s` }}
-              >
+              {p.growth > 0.3 && (
+                <path
+                  d={`M0 ${-h * 0.35}Q16 ${-h * 0.7} 19 ${-h * 0.4}Q6 ${-h * 0.2} 0 ${-h * 0.35}M0 ${-h * 0.6}Q-15 ${-h * 0.9}-17 ${-h * 0.6}Q-5 ${-h * 0.4} 0 ${-h * 0.6}`}
+                  fill={"#63a44c"}
+                />
+              )}
+              {p.growth > 0.5 && (
                 <g
                   transform={`translate(0 ${-h}) scale(${clamp((p.growth - 0.5) * 2)})`}
                 >
                   <Blossom kind={kind % 4} color={color} />
                 </g>
-              </g>
-            )}
+              )}
+            </g>
           </g>
         );
       })}
@@ -150,7 +150,7 @@ export function Tree({
     leaf = mix(palette.leaf, "#263d3c", night * 0.7),
     light = mix(palette.light, "#304744", night * 0.65);
   return (
-    <g transform={`translate(${x} ${y}) scale(${scale})`}>
+    <g data-garden-tree="" transform={`translate(${x} ${y}) scale(${scale})`}>
       <ellipse cy="8" rx="55" ry="13" fill="#344831" opacity=".16" />
       <path
         d="M-8 0L-5-97L8-97L10 0Z"

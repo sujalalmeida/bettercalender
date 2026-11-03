@@ -1,3 +1,5 @@
+import { GardenProjects } from "./garden/GardenProjects";
+import { GardenBeds, GardenFlowerSymbols } from "./garden/GardenBeds";
 import { gardenStage } from "../lib/gardenState";
 import { progress, noise, mix, palettes } from "../lib/gardenPalette";
 import {
@@ -36,6 +38,7 @@ export function GardenLandscape({
       aria-label={`${season.toLowerCase()} cottage garden, ${stage.phase.toLowerCase()}, ${stage.flowers} blooms grown${stream ? ", a flowing stream" : ""}${cottage ? ", cottages" : ""}${minutes >= 60 ? ", garden keepers" : ""}`}
     >
       <defs>
+        <GardenFlowerSymbols />
         <pattern
           id="garden-meadow-specks"
           width={Math.max(30, 110 - stage.meadowLevel * 6)}
@@ -134,37 +137,72 @@ export function GardenLandscape({
         fill="url(#garden-meadow-specks)"
         clip-path="url(#garden-field-clip)"
       />
+      <GardenProjects
+        minutes={minutes}
+        night={night}
+        summer={season === "Summer"}
+        seed={seed}
+        layer="back"
+      />
       {stream > 0 && (
-        <g opacity={stream}>
+        <g opacity={stream} class="garden-stream">
           <path
             d="M1240 365C1090 441 1385 462 1265 565C1140 676 1128 698 1206 790C1272 879 1127 931 1088 1000H1288C1312 926 1410 864 1338 781C1210 659 1293 651 1370 565C1486 435 1194 431 1280 365Z"
-            fill={mix("#b1c6b7", "#506d71", night * 0.7)}
+            fill={mix("#c9dc8e", "#66875b", night * 0.6)}
           />
           <path
             d="M1258 370C1150 448 1429 460 1310 565C1193 677 1197 717 1271 792C1336 874 1201 947 1186 1010"
             fill="none"
-            stroke={mix("#8cbbc2", "#466570", night * 0.7)}
-            stroke-width="67"
+            stroke={mix("#a6ddd0", "#477d82", night * 0.65)}
+            stroke-width="88"
+          />
+          <path
+            d="M1258 370C1150 448 1429 460 1310 565C1193 677 1197 717 1271 792C1336 874 1201 947 1186 1010"
+            fill="none"
+            stroke={mix("#58bccf", "#367d97", night * 0.6)}
+            stroke-width="66"
           />
           <g
             class="garden-water-flow"
             fill="none"
-            stroke={mix("#d4e3d5", "#8da4a3", night * 0.65)}
-            stroke-width="2.5"
-            opacity=".6"
-            stroke-dasharray="18 53 8 37"
+            stroke={mix("#e1f8ef", "#9bd9d9", night * 0.4)}
+            stroke-width="2"
+            opacity=".75"
+            stroke-dasharray="25 88 11 60"
           >
-            <path d="M1258 376C1150 448 1429 460 1310 565C1193 677 1197 717 1271 792C1336 874 1201 947 1186 1000" />
-            <path d="M1265 405C1283 456 1403 478 1331 559C1238 665 1204 696 1287 801C1354 883 1221 941 1210 1000" />
+            <path d="M1250 376C1142 448 1421 460 1302 565C1185 677 1189 717 1263 792C1328 874 1193 947 1178 1000" />
+            <path d="M1278 405C1296 456 1416 478 1344 559C1251 665 1217 696 1300 801C1367 883 1234 941 1223 1000" />
           </g>
-          {Array.from({ length: 14 }, (_, i) => (
-            <ellipse
-              cx={i < 7 ? 1102 + i * 16 : 1305 + (i - 7) * 14}
-              cy={813 + (i % 7) * 24}
-              rx={7 + (i % 3) * 3}
-              ry={4 + (i % 2) * 2}
-              fill={mix("#939d8b", "#58665d", night * 0.7)}
-            />
+          <path
+            class="garden-water-shimmer"
+            d="M1265 379C1157 450 1436 461 1317 565C1200 677 1204 717 1278 792C1343 874 1208 947 1193 1000"
+            fill="none"
+            stroke="#b6eceb"
+            stroke-width="7"
+            opacity=".4"
+            stroke-dasharray="3 153 2 67"
+          />
+          {[
+            { x: 1245, y: 418 },
+            { x: 1371, y: 512 },
+            { x: 1210, y: 692 },
+            { x: 1357, y: 859 },
+            { x: 1160, y: 957 },
+          ].map((rock, i) => (
+            <g key={i} transform={`translate(${rock.x} ${rock.y})`}>
+              <ellipse cy="3" rx="14" ry="6" fill="#438981" opacity=".2" />
+              <ellipse
+                rx={10 + (i % 3) * 2}
+                ry="6"
+                fill={mix("#d0d0a0", "#829d8a", night * 0.55)}
+              />
+              <path
+                d="M-6-2Q0-6 5-2"
+                fill="none"
+                stroke="#e7e1ba"
+                stroke-width="1.5"
+              />
+            </g>
           ))}
         </g>
       )}
@@ -349,6 +387,17 @@ export function GardenLandscape({
             />
             <path d="M-6-4Q-13-14 0-28Q11-15 6-3Z" fill="#edd28c" />
           </g>
+          {[-9, 2, 10].map((x, i) => (
+            <circle
+              key={x}
+              class="garden-ember"
+              style={{ animationDelay: `${-i * 1.3}s` }}
+              cx={x}
+              cy={-24 - i * 5}
+              r="1.5"
+              fill="#ffe7a3"
+            />
+          ))}
           <path
             d="M-49 16L-48-2M-64 12L-48-6L-33 10"
             stroke="#8f7958"
@@ -372,6 +421,14 @@ export function GardenLandscape({
         </g>
       )}
       <Flowers minutes={minutes} seed={seed} night={night} />
+      <GardenBeds minutes={minutes} seed={seed} night={night} />
+      <GardenProjects
+        minutes={minutes}
+        night={night}
+        summer={season === "Summer"}
+        seed={seed}
+        layer="front"
+      />
       {minutes >= 120 && (
         <g class="garden-butterflies" opacity={1 - night}>
           {[0, 1, 2].map((i) => (
