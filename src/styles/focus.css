@@ -853,3 +853,230 @@
     bottom: 165px;
   }
 }
+
+/* SVG stays sharp at iPad scale; motion is limited to a small set of scene details. */
+.garden-landscape {
+  shape-rendering: geometricPrecision;
+}
+.focus-landscape-heading {
+  padding: 19px 0 17px;
+}
+.focus-landscape-heading h1 {
+  margin: 0;
+  font:
+    400 24px Georgia,
+    serif;
+  letter-spacing: -0.02em;
+}
+.focus-garden-scene {
+  background: #244b37;
+}
+.focus-is-preview .garden-landscape * {
+  transition: none !important;
+}
+.focus-camera-controls button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.focus-camera-controls button:disabled {
+  opacity: 0.35;
+}
+.focus-camera-controls .focus-fit {
+  font-size: 11px;
+  padding: 0 5px;
+}
+.focus-scene-controls button {
+  min-height: 44px;
+}
+.focus-season {
+  padding-bottom: 0;
+}
+.focus-preview-time {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  font-size: 12px;
+  margin: 14px 0;
+}
+.focus-preview-time input {
+  grid-column: 1/-1;
+  grid-row: 2;
+  width: 100%;
+  accent-color: #cfdbbd;
+  min-height: 30px;
+}
+.focus-preview-time output {
+  font-variant-numeric: tabular-nums;
+}
+.focus-garden-scene .focus-scene-controls {
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+}
+.focus-immersive {
+  height: 100dvh;
+  overscroll-behavior: none;
+}
+.focus-immersive .focus-control-panel {
+  bottom: max(16px, env(safe-area-inset-bottom));
+  left: max(16px, env(safe-area-inset-left));
+  right: max(16px, env(safe-area-inset-right));
+}
+.focus-immersive .focus-scene-badges {
+  top: max(12px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+}
+.focus-controls-hidden .focus-camera-controls {
+  bottom: max(16px, env(safe-area-inset-bottom));
+}
+@keyframes garden-water-shimmer {
+  to {
+    stroke-dashoffset: -223;
+  }
+}
+.garden-water-shimmer {
+  animation: garden-water-shimmer 18s linear infinite;
+}
+.garden-water-flow {
+  animation-duration: 14s;
+}
+.garden-waterwheel {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: garden-mill 42s linear infinite reverse;
+}
+@keyframes garden-ripple {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+.garden-pond-ripple {
+  animation: garden-ripple 6s ease-in-out infinite;
+}
+@keyframes garden-bee-flight {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  30% {
+    transform: translate(10px, -7px);
+  }
+  65% {
+    transform: translate(-6px, 2px);
+  }
+}
+.garden-bee {
+  animation: garden-bee-flight 9s ease-in-out infinite;
+}
+@keyframes garden-duck-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-1deg);
+  }
+  50% {
+    transform: translate(9px, 2px) rotate(2deg);
+  }
+}
+.garden-duck {
+  animation: garden-duck-drift 16s ease-in-out infinite;
+}
+@keyframes garden-rabbit-rest {
+  0%,
+  70%,
+  100% {
+    transform: translateY(0);
+  }
+  80% {
+    transform: translateY(-2px);
+  }
+  90% {
+    transform: translateY(-1px);
+  }
+}
+.garden-rabbit {
+  animation: garden-rabbit-rest 13s ease-in-out infinite;
+}
+@keyframes garden-cloth {
+  0%,
+  100% {
+    transform: skewX(-1deg);
+  }
+  50% {
+    transform: skewX(2deg);
+  }
+}
+.garden-laundry {
+  transform-box: fill-box;
+  transform-origin: center top;
+  animation: garden-cloth 9s ease-in-out infinite;
+}
+@keyframes garden-swing-seat {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+.garden-swing {
+  transform-box: fill-box;
+  transform-origin: center top;
+  animation: garden-swing-seat 6s ease-in-out infinite;
+}
+.garden-paper-lantern {
+  transform-box: fill-box;
+  transform-origin: center top;
+  animation: garden-swing-seat 8s ease-in-out infinite;
+}
+.garden-fountain-water {
+  animation: garden-ripple 3s ease-in-out infinite;
+}
+@keyframes garden-ember {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(7px, -35px);
+    opacity: 0;
+  }
+}
+.garden-ember {
+  animation: garden-ember 4s ease-out infinite;
+}
+@keyframes garden-step {
+  0%,
+  100% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}
+.garden-walker .garden-villager-legs {
+  transform-box: fill-box;
+  transform-origin: center top;
+  animation: garden-step 1.3s ease-in-out infinite;
+}
+@media (max-width: 600px) {
+  .focus-landscape-heading h1 {
+    font-size: 23px;
+  }
+  .focus-immersive .focus-control-panel {
+    bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .focus-scene-badges {
+    max-width: calc(100% - 120px);
+    flex-wrap: wrap;
+  }
+  .focus-immersive .focus-scene-badges {
+    max-width: calc(100% - 180px);
+  }
+}
