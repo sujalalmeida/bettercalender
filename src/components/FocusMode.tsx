@@ -102,10 +102,14 @@ export function FocusMode() {
     [restartConfirm, setRestartConfirm] = useState(false);
   const [immersive, setImmersive] = useState(false),
     [hiddenControls, setHiddenControls] = useState(false);
+  const nativeFullscreen = useRef(false);
   const [motion, setMotion] = useState(
     () => !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const [preview, setPreview] = useState<number | null>(null);
+  const [fitGarden, setFitGarden] = useState(false),
+    fitRef = useRef(false);
+  fitRef.current = fitGarden;
   const root = useRef<HTMLDivElement>(null),
     scene = useRef<HTMLDivElement>(null),
     camera = useRef(0.5),
@@ -116,12 +120,18 @@ export function FocusMode() {
   function moveCamera(position: number) {
     camera.current = Math.max(0, Math.min(1, position));
     const { width, height } = cameraSize.current;
-    scene.current
-      ?.querySelector("svg")
-      ?.setAttribute(
-        "viewBox",
-        gardenViewBox(width, height, camera.current).join(" "),
-      );
+    const svg = scene.current?.querySelector("svg");
+    svg?.setAttribute(
+      "viewBox",
+      (fitRef.current
+        ? [0, 0, 1600, 1000]
+        : gardenViewBox(width, height, camera.current)
+      ).join(" "),
+    );
+    svg?.setAttribute(
+      "preserveAspectRatio",
+      fitRef.current ? "xMidYMid meet" : "xMidYMid slice",
+    );
   }
   useEffect(() => {
     if (!scene.current) return;
@@ -136,6 +146,7 @@ export function FocusMode() {
     return () => observer.disconnect();
   }, []);
   function cameraDown(event: PointerEvent) {
+    if (fitRef.current) return;
     if (
       (event.target as Element).closest("button") ||
       (event.pointerType === "mouse" && event.button !== 0)
@@ -149,6 +160,7 @@ export function FocusMode() {
     scene.current?.setPointerCapture(event.pointerId);
   }
   function cameraMove(event: PointerEvent) {
+    if (fitRef.current) return;
     const drag = cameraDrag.current;
     if (!drag || drag.id !== event.pointerId) return;
     const { width, height } = cameraSize.current,
@@ -283,7 +295,13 @@ export function FocusMode() {
   }, []);
   useEffect(() => {
     const full = () => {
-      if (!document.fullscreenElement) setImmersive(false);
+      if (document.fullscreenElement === root.current)
+        nativeFullscreen.current = true;
+      else if (nativeFullscreen.current) {
+        nativeFullscreen.current = false;
+        setImmersive(false);
+        setHiddenControls(false);
+      }
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -326,9 +344,7 @@ export function FocusMode() {
     try {
       await saveFocusSession(clockRef.current);
       commit(newClock(garden.generation));
-      setNotice(
-        "Stopwatch reset. Your garden keeps growing from its saved progress.",
-      );
+      setNotice("Stopwatch reset.");
     } catch {
       setError(
         "Could not save this session. Try again before resetting the stopwatch.",
@@ -350,9 +366,7 @@ export function FocusMode() {
       commit(next);
       setRestartConfirm(false);
       setPreview(null);
-      setNotice(
-        "A new garden has started. Your stopwatch and study history are kept.",
-      );
+      setNotice("Garden restarted.");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Could not restart the garden.",
@@ -360,6 +374,11 @@ export function FocusMode() {
     } finally {
       setActionBusy(false);
     }
+  }
+  function toggleFitGarden() {
+    fitRef.current = !fitRef.current;
+    setFitGarden(fitRef.current);
+    moveCamera(camera.current);
   }
   async function toggleFullscreen() {
     if (immersive) {
@@ -379,16 +398,16 @@ export function FocusMode() {
   const landscape = useMemo(
     () => (
       <GardenLandscape
-        elapsedMs={Math.floor(viewMs / 10000) * 10000}
+        elapsedMs={Math.floor(viewMs / 5000) * 5000}
         seed={garden?.seed ?? 1}
         motion={motion}
       />
     ),
-    [Math.floor(viewMs / 10000), garden?.seed, motion],
+    [Math.floor(viewMs / 5000), garden?.seed, motion],
   );
   return (
     <div
-      class={`focus-shell ${immersive ? "focus-immersive" : ""} ${hiddenControls ? "focus-controls-hidden" : ""}`}
+      class={`focus-shell ${preview !== null ? "focus-is-preview" : ""} ${immersive ? "focus-immersive" : ""} ${hiddenControls ? "focus-controls-hidden" : ""}`}
       ref={root}
     >
       <header class="focus-header">
@@ -417,12 +436,7 @@ export function FocusMode() {
       </header>
       <main class="focus-layout">
         <div class="focus-landscape-heading">
-          <div>
-            <span class="focus-eyebrow">YOUR GROWING WORLD</span>
-            <h1>
-              {preview !== null ? "A glimpse ahead." : "A place to grow."}
-            </h1>
-          </div>
+          <h1>Garden</h1>
           <div class="focus-season">
             <span>{viewStage.season}</span>
             <i />
@@ -442,58 +456,62 @@ export function FocusMode() {
             onPointerCancel={cameraUp}
           >
             {landscape}
-            <div class="focus-scene-badges">
-              <span>
-                {preview !== null
-                  ? "Landscape preview"
-                  : running
-                    ? "Growing with you"
-                    : "Your saved garden"}
-              </span>
-              {preview !== null && (
+            {preview !== null && (
+              <div class="focus-scene-badges">
+                <span>Preview</span>
                 <button onClick={() => setPreview(null)}>
                   Return to garden
                 </button>
-              )}
-            </div>
+              </div>
+            )}
             <div class="focus-camera-controls">
               <button
+                disabled={fitGarden}
                 aria-label="View left side of garden"
                 onClick={() => moveCamera(camera.current - 0.3)}
               >
                 ←
               </button>
-              <span>Explore</span>
               <button
+                class="focus-fit"
+                onClick={toggleFitGarden}
+                aria-pressed={fitGarden}
+              >
+                {fitGarden ? "Fill view" : "Fit garden"}
+              </button>
+              <button
+                disabled={fitGarden}
                 aria-label="View right side of garden"
                 onClick={() => moveCamera(camera.current + 0.3)}
               >
                 →
               </button>
             </div>
-            {immersive && (
-              <div class="focus-scene-controls">
-                <button
-                  class="focus-show-controls"
-                  onClick={() => setHiddenControls(!hiddenControls)}
-                  aria-label={
-                    hiddenControls
-                      ? "Show garden controls"
-                      : "Hide garden controls"
-                  }
-                >
-                  {hiddenControls ? "Show controls" : "Hide controls"}
-                </button>
-                <button
-                  class="focus-exit"
-                  onClick={() => {
-                    void toggleFullscreen();
-                  }}
-                >
-                  Exit ↙
-                </button>
-              </div>
-            )}
+            <div class="focus-scene-controls">
+              <button
+                class="focus-show-controls"
+                hidden={!immersive}
+                onClick={() => setHiddenControls(!hiddenControls)}
+                aria-label={
+                  hiddenControls
+                    ? "Show garden controls"
+                    : "Hide garden controls"
+                }
+              >
+                {hiddenControls ? "Show controls" : "Hide controls"}
+              </button>
+              <button
+                class="focus-exit"
+                aria-label={
+                  immersive ? "Exit full screen" : "Enter full screen"
+                }
+                onClick={() => {
+                  void toggleFullscreen();
+                }}
+              >
+                {immersive ? "Exit ↙" : "Full screen ↗"}
+              </button>
+            </div>
           </div>
         </section>
         <section class="focus-control-panel" aria-label="Focus stopwatch">
@@ -507,11 +525,7 @@ export function FocusMode() {
               {formatFocusTime(displayed)}
             </div>
             <span class="focus-timer-state">
-              {running
-                ? "Running · continues in the background"
-                : displayed
-                  ? "Paused"
-                  : "Ready when you are"}
+              {running ? "Running" : displayed ? "Paused" : "Ready"}
             </span>
           </div>
           <div class="focus-clock-actions">
@@ -550,7 +564,7 @@ export function FocusMode() {
             </div>
             <div>
               <strong>{stage.flowers.toLocaleString()}</strong>
-              <span>Blooms grown</span>
+              <span>Flowers</span>
             </div>
           </div>
         </section>
@@ -575,25 +589,43 @@ export function FocusMode() {
         )}
         <footer class="focus-garden-footer">
           <div class="focus-next">
-            <span class="focus-eyebrow">
-              {stage.next ? "NEXT IN YOUR GARDEN" : "A GARDEN FOR EVERY SEASON"}
-            </span>
+            <span class="focus-eyebrow">{stage.next ? "Next" : "Garden"}</span>
             <span>
               {stage.next
                 ? `${stage.next.label} · ${Math.ceil(stage.next.minutes - stage.minutes)} min to go`
-                : "New blooms, changing seasons, and another day in your little world."}
+                : "Planting continues"}
             </span>
           </div>
           <div class="focus-footer-actions">
             <button aria-pressed={!motion} onClick={() => setMotion(!motion)}>
-              {motion ? "Still scene" : "Gentle motion"}
+              {motion ? "Still scene" : "Motion on"}
             </button>
             <details class="focus-roadmap">
               <summary>Explore growth</summary>
               <div>
-                <p>Preview only · your saved garden stays the same.</p>
+                <p>Preview · does not change saved progress.</p>
+                <label class="focus-preview-time">
+                  Study time
+                  <input
+                    aria-label="Preview study time"
+                    type="range"
+                    min="0"
+                    max="8640"
+                    step="1"
+                    value={(preview ?? total) / 60000}
+                    onInput={(e) =>
+                      setPreview(Number(e.currentTarget.value) * 60000)
+                    }
+                  />
+                  <output>
+                    {Math.floor((preview ?? total) / 3600000)}h{" "}
+                    {Math.floor((preview ?? total) / 60000) % 60}m
+                  </output>
+                </label>
                 <div>
-                  {[0, 45, 120, 360, 660, 720, 1440, 2880].map((minute) => (
+                  {[
+                    0, 45, 120, 360, 660, 720, 1440, 2880, 3600, 5760, 8640,
+                  ].map((minute) => (
                     <button
                       aria-pressed={preview === minute * 60000}
                       onClick={() => setPreview(minute * 60000)}
