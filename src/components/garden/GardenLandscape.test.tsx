@@ -52,6 +52,13 @@ describe("garden scene", () => {
       .filter((e) => "data-garden-project" in e.props)
       .map((e) => e.props["data-garden-project"]);
     expect(earned.sort()).toEqual(GARDEN_PROJECTS.map((p) => p.id).sort());
+    expect(
+      mature.some(
+        (e) =>
+          e.type === "g" &&
+          e.props["clip-path"] === "url(#garden-world-boundary)",
+      ),
+    ).toBe(true);
     const ids = mature.flatMap((e) => (e.props.id ? [e.props.id] : []));
     expect(new Set(ids).size).toBe(ids.length);
     for (const e of mature.filter((e) => e.type === "use"))
