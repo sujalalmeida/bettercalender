@@ -95,8 +95,7 @@
 .focus-garden-scene {
   position: relative;
   width: 100%;
-  aspect-ratio: 16/9;
-  max-height: 76dvh;
+  aspect-ratio: 8/5;
   min-height: 330px;
   overflow: hidden;
 }

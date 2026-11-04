@@ -724,7 +724,13 @@ export function GardenProjects({
                   kind={project.kind}
                   night={night}
                   summer={summer}
-                  variant={i}
+                  variant={
+                    project.id === "village-bunting"
+                      ? 1
+                      : project.id === "lantern-walk"
+                        ? 0
+                        : i
+                  }
                 />
               </g>
               {build < 1 && (

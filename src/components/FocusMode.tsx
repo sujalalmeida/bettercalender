@@ -102,7 +102,6 @@ export function FocusMode() {
     [restartConfirm, setRestartConfirm] = useState(false);
   const [immersive, setImmersive] = useState(false),
     [hiddenControls, setHiddenControls] = useState(false);
-  const nativeFullscreen = useRef(false);
   const [motion, setMotion] = useState(
     () => !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
@@ -294,27 +293,17 @@ export function FocusMode() {
     };
   }, []);
   useEffect(() => {
-    const full = () => {
-      if (document.fullscreenElement === root.current)
-        nativeFullscreen.current = true;
-      else if (nativeFullscreen.current) {
-        nativeFullscreen.current = false;
-        setImmersive(false);
-        setHiddenControls(false);
-      }
-    };
+    // Native fullscreen can end on a tab switch. Keep the expanded iPad layout
+    // until Exit or Escape, including browsers that do not expose native fullscreen.
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setImmersive(false);
         setHiddenControls(false);
-        setPreview(null);
         setRestartConfirm(false);
       }
     };
-    document.addEventListener("fullscreenchange", full);
     window.addEventListener("keydown", escape);
     return () => {
-      document.removeEventListener("fullscreenchange", full);
       window.removeEventListener("keydown", escape);
     };
   }, []);
