@@ -2,6 +2,7 @@ import { useRef, useState } from 'preact/hooks'
 import type { TaskViewModel } from '../db/repository'
 import type { Category } from '../db/types'
 import { CategoryDot } from './CategoryDot'
+import { PlannerIcon } from './PlannerIcon'
 
 const SWIPE_THRESHOLD = 72
 
@@ -11,10 +12,11 @@ interface Props {
   onToggle: () => void
   onDelete: (scope: 'this' | 'all-future') => void
   onOpenDetails: () => void
-  onGripPointerDown: (e: PointerEvent) => void
+  onGripPointerDown?: (e: PointerEvent) => void
+  timeline?: boolean
 }
 
-export function TaskRow({ task, category, onToggle, onDelete, onOpenDetails, onGripPointerDown }: Props) {
+export function TaskRow({ task, category, onToggle, onDelete, onOpenDetails, onGripPointerDown, timeline = false }: Props) {
   const [dragX, setDragX] = useState(0)
   const [swiping, setSwiping] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -43,17 +45,18 @@ export function TaskRow({ task, category, onToggle, onDelete, onOpenDetails, onG
   function onPointerUp() {
     if (axisLocked.current === 'x') {
       if (dragX < -SWIPE_THRESHOLD) {
-        if (task.recurrenceId) {
-          setConfirming(true)
-        } else {
-          onDelete('this')
-        }
+        requestDelete()
       }
       setDragX(0)
     }
     start.current = null
     axisLocked.current = null
     setSwiping(false)
+  }
+
+  function requestDelete() {
+    if (task.recurrenceId) setConfirming(true)
+    else onDelete('this')
   }
 
   function cancelSwipe() {
@@ -64,7 +67,7 @@ export function TaskRow({ task, category, onToggle, onDelete, onOpenDetails, onG
   }
 
   return (
-    <li class="task-row-wrap">
+    <li class={`task-row-wrap ${timeline ? 'timeline-task-wrap' : ''}`}>
       <div class="task-row-delete-bg" aria-hidden="true">
         Delete
       </div>
@@ -92,24 +95,29 @@ export function TaskRow({ task, category, onToggle, onDelete, onOpenDetails, onG
           onPointerUp={onPointerUp}
           onPointerCancel={cancelSwipe}
         >
-          <button class="task-row-grip" aria-label="Reorder task" onPointerDown={onGripPointerDown}>
+          {onGripPointerDown && <button class="task-row-grip" aria-label="Reorder task" onPointerDown={onGripPointerDown}>
             ⠿
-          </button>
+          </button>}
           <button
             class={`task-row-circle ${task.done ? 'is-done' : ''}`}
             onClick={onToggle}
             aria-pressed={task.done}
-            aria-label={task.done ? 'Mark incomplete' : 'Mark complete'}
+            aria-label={timeline ? (task.done ? `Mark ${task.title} incomplete` : `Complete ${task.title}`) : (task.done ? 'Mark incomplete' : 'Mark complete')}
           />
+          {timeline && <CategoryDot color={category?.color ?? 'var(--color-text-tertiary)'} size={8} />}
           <button class="task-row-main" onClick={onOpenDetails}>
             <span class={`task-row-title ${task.done ? 'is-done' : ''}`}>{task.title}</span>
             <span class="task-row-meta">
-              {category && <CategoryDot color={category.color} />}
-              {task.time && <span class="task-row-time">{task.time}</span>}
+              {category && (timeline ? <span>{category.name}</span> : <CategoryDot color={category.color} />)}
+              {!timeline && task.time && <span class="task-row-time">{task.time}</span>}
               {task.deadline && <span class="task-row-badge">Deadline</span>}
               {task.virtual && <span class="task-row-badge task-row-badge-muted">Repeats</span>}
             </span>
           </button>
+          {timeline && <div class="timeline-task-actions">
+            <button aria-label={`Edit ${task.title}`} onClick={onOpenDetails}><PlannerIcon name="pen" /></button>
+            <button aria-label={`Delete ${task.title}`} onClick={requestDelete}><PlannerIcon name="trash" /></button>
+          </div>}
         </div>
       )}
     </li>
