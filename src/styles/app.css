@@ -802,63 +802,48 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 8px 8px;
 }
-.week-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+.week-heading {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 4px;
-}
-.week-day-card {
-  background: var(--color-bg-elevated);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 72px;
-  flex-shrink: 0;
-}
-.week-day-card.is-today {
-  box-shadow: inset 0 0 0 2px var(--color-accent);
-}
-.week-day-card-header {
-  display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0 24px;
 }
-.week-day-card-title {
-  font-weight: 700;
-  font-size: 15px;
+.week-heading h1, .timeline-heading h1 {
+  font-size: clamp(34px, 4.4vw, 56px);
+  font-weight: 350;
+  letter-spacing: -.065em;
+  line-height: 1.07;
+  margin: 14px 0 0;
 }
-.week-day-card-tasks {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.week-list { flex: 1; min-height: 0; overflow-y: auto; border-top: 1px solid var(--color-border); }
+.week-day-card {
+  display: grid;
+  grid-template-columns: minmax(85px, 104px) 42px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  width: 100%;
+  min-height: 122px;
+  padding: 20px 8px 20px 0;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
 }
-.week-day-card-tasks li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-.week-day-card-tasks li.is-done {
-  text-decoration: line-through;
-  opacity: 0.6;
-}
-.week-day-card-empty {
-  color: var(--color-text-tertiary);
-  font-style: italic;
-}
+.week-day-card:hover, .week-day-card:focus-visible { background: var(--color-bg-sunken); }
+.week-day-card:focus-visible { outline-offset: -2px; }
+.week-day-card-header { display: grid; justify-items: start; gap: 6px; }
+.week-day-card-title { display: grid; place-items: center; width: 42px; height: 42px; font-size: 18px; font-weight: 550; }
+.week-day-card.is-today .week-day-card-title { border-radius: 50%; background: var(--color-accent); color: var(--color-accent-contrast); }
+.week-open-day { display: grid; place-items: center; width: 40px; height: 40px; font-size: 22px; color: var(--color-text-secondary); }
+.week-day-content { align-self: center; min-width: 0; padding-left: 10px; }
+.week-day-card-meta { display: flex; gap: 8px; align-items: center; color: var(--color-text-secondary); }
+.week-day-card-meta:empty { display: none; }
+.week-day-card-note { display: block; margin: 4px 0; color: var(--color-text-secondary); font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.week-day-card-tasks { display: grid; gap: 5px; }
+.week-task { display: flex; align-items: baseline; gap: 10px; font-size: 14px; overflow-wrap: anywhere; }
+.week-task.is-done { text-decoration: line-through; color: var(--color-text-secondary); }
+.week-task .task-row-time { flex-shrink: 0; color: var(--color-text-secondary); font-size: 12px; }
+.week-day-card-empty { color: var(--color-text-tertiary); font-size: 13px; }
 
 /* ---------- Search ---------- */
 
@@ -1206,12 +1191,6 @@
 .day-cell-number { width: 26px; height: 26px; font-weight: 650; }
 .day-cell-preview-line { font-size: 13px; color: var(--color-text-secondary); }
 .day-cell-preview-line:first-child { color: var(--color-text); font-weight: 600; }
-.week-list { gap: 10px; padding: 4px 3px 16px; }
-.week-day-card { border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-bg-elevated); box-shadow: none; padding: 16px 18px; }
-.week-day-card.is-today { box-shadow: inset 0 0 0 1px var(--color-today-ring); }
-.week-day-card-note { margin: 8px 0 12px; color: var(--color-text-secondary); font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
-.week-day-card-tasks li > span { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
-.week-day-card-tasks .task-row-time { flex-shrink: 0; white-space: nowrap; }
 .task-row-title,.workspace-card h3,.workspace-card p,.search-result-snippet { overflow-wrap: anywhere; white-space: pre-wrap; }
 .task-row { border: 1px solid var(--color-border); background: var(--color-bg-elevated); border-radius: 8px; min-height: 52px; }
 .task-row-circle { border-color: var(--color-accent); }
