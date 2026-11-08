@@ -73,7 +73,7 @@ export function NotesEditor({ dateISO, initialNotes, autoFocus }: Props) {
     <textarea
       ref={textareaRef}
       class="notes-editor"
-      placeholder="Notes…"
+      placeholder="Type, dictate, or use Scribble…"
       aria-label="Day notes"
       value={value}
       onInput={handleInput}
