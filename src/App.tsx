@@ -150,13 +150,13 @@ export function App({ initialStorageNotice }: { initialStorageNotice: string | n
         </button>
       </div>
 
-      {(view === 'today' || view === 'month' || view === 'week') && <DueSoonStrip onJumpToDate={jumpToDate} />}
+      {(view === 'month' || view === 'week') && <DueSoonStrip onJumpToDate={jumpToDate} />}
       {storageNotice && <div class="storage-notice" role="alert"><span>{storageNotice}</span><button class="chip-btn" onClick={() => setStorageNotice(null)}>OK</button></div>}
       {(view === 'today' || view === 'month' || view === 'week') && <RolloverBanner onReview={jumpToDate} />}
 
       <div class="app-view">
         {view === 'today' ? (
-          <TodayTimeline date={timelineDate} onDateChange={setTimelineDate} weekStartsOn={weekStartsOn} onOpenDay={handleExpand} />
+          <TodayTimeline date={timelineDate} onDateChange={setTimelineDate} weekStartsOn={weekStartsOn} onOpenDay={handleExpand} onJumpToDate={jumpToDate} onOpenMilestones={() => setView('milestones')} />
         ) : view === 'month' ? (
           <MonthGrid
             currentMonth={currentMonth}
