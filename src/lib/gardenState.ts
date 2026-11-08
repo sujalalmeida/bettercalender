@@ -10,6 +10,8 @@ import {
 } from "./focusTimer";
 
 export const GARDEN_CLOCK_KEY = "plan.focus-clock.v2";
+export const OUTPOST_CLOCK_KEY = "plan.focus-outpost-clock.v2";
+export type FocusWorld = "main" | "outpost";
 export interface GardenClock {
   version: 2;
   id: string;
@@ -17,11 +19,14 @@ export interface GardenClock {
   timer: FocusTimerState;
   displayOffsetMs: number;
   createdAt: number;
+  goalMinutes?: number;
 }
-export const newGarden = (now = Date.now()): FocusGarden => ({
-  id: "main",
-  generation: createId(),
-  seed: Math.floor(Math.random() * 2147483647),
+export const newGarden = (now = Date.now(), world: FocusWorld = "main"): FocusGarden => ({
+  id: world,
+  // The outpost is permanent. Devices opening it for the first time can
+  // contribute to the same world even before they have synced its metadata.
+  generation: world === "outpost" ? "outpost-v1" : createId(),
+  seed: world === "outpost" ? 33711 : Math.floor(Math.random() * 2147483647),
   createdAt: now,
   updatedAt: now,
 });

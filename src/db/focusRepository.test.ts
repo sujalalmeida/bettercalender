@@ -2,9 +2,9 @@ import { afterAll,afterEach,beforeAll,describe,expect,it } from 'vitest'
 import { db } from './db'
 import { ensureFocusGarden,restartFocusGarden,saveFocusSession } from './focusRepository'
 import { gardenElapsed,newClock } from '../lib/gardenState'
-import { exportAll,importAll } from './repository'
+import { exportAll,importAll,saveDayNotes } from './repository'
 beforeAll(()=>db.open())
-afterEach(async()=>{await db.focusGardens.clear();await db.focusSessions.clear()})
+afterEach(async()=>{await db.focusGardens.clear();await db.focusSessions.clear();await db.days.clear()})
 afterAll(()=>db.close())
 describe('garden persistence',()=>{
   it('migrates recorded legacy credit once and never clears it on re-open',async()=>{
@@ -34,5 +34,26 @@ describe('garden persistence',()=>{
     await importAll({...backup,version:4,focusGardens:undefined,focusSessions:undefined},'replace')
     expect((await db.focusGardens.get('main'))?.generation).toBe(garden.generation)
     expect(await db.focusSessions.count()).toBe(1)
+  })
+  it('adds outpost progress without replacing the existing garden, sessions, or dated notes', async () => {
+    const garden = await ensureFocusGarden(3600000)
+    await saveDayNotes('2026-11-09', 'Existing notes')
+    const before = await exportAll()
+    const outpost = await ensureFocusGarden(3600000, 'outpost')
+    const clock = newClock(outpost.generation, 0)
+    clock.timer.elapsedMs = 120000
+    await saveFocusSession(clock, 120000)
+    expect(await ensureFocusGarden(0, 'outpost')).toEqual(outpost)
+    const backup = await exportAll()
+    expect(backup.days).toEqual(before.days)
+    expect(backup.focusGardens).toContainEqual(garden)
+    expect(backup.focusSessions).toEqual(expect.arrayContaining(before.focusSessions!))
+    expect(gardenElapsed(garden, backup.focusSessions!, null)).toBe(3600000)
+    expect(gardenElapsed(outpost, backup.focusSessions!, null)).toBe(120000)
+
+    const restartedGarden = await restartFocusGarden(garden)
+    expect(gardenElapsed(restartedGarden, backup.focusSessions!, null)).toBe(0)
+    expect(await db.focusGardens.get('outpost')).toEqual(outpost)
+    expect(gardenElapsed(outpost, await db.focusSessions.toArray(), null)).toBe(120000)
   })
 })

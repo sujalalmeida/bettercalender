@@ -1,15 +1,15 @@
 import { db } from './db'
 import { createId } from '../lib/id'
-import { newGarden, sessionSnapshot, type GardenClock } from '../lib/gardenState'
+import { newGarden, sessionSnapshot, type FocusWorld, type GardenClock } from '../lib/gardenState'
 import type { FocusGarden } from './types'
 
-export async function ensureFocusGarden(legacyCredit=0):Promise<FocusGarden> {
+export async function ensureFocusGarden(legacyCredit=0, world:FocusWorld='main'):Promise<FocusGarden> {
   return db.transaction('rw',db.focusGardens,db.focusSessions,async()=>{
-    const existing=await db.focusGardens.get('main')
+    const existing=await db.focusGardens.get(world)
     if(existing) return existing
-    const garden=newGarden()
+    const garden=newGarden(Date.now(),world)
     await db.focusGardens.put(garden)
-    if(legacyCredit>0) await db.focusSessions.put({id:'legacy-focus-credit',gardenId:garden.generation,elapsedMs:legacyCredit,createdAt:garden.createdAt,updatedAt:garden.updatedAt})
+    if(world==='main'&&legacyCredit>0) await db.focusSessions.put({id:'legacy-focus-credit',gardenId:garden.generation,elapsedMs:legacyCredit,createdAt:garden.createdAt,updatedAt:garden.updatedAt})
     return garden
   })
 }
