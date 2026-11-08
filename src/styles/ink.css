@@ -45,3 +45,65 @@ body.ink-is-expanded .expand-overlay { padding:0; }
 .expand-card .ink-editor.ink-expanded .ink-scroll { flex:1 1 0;height:auto;min-height:0; }
 @media(max-width:680px) { .ink-workspace-heading { padding:7px 9px; }.ink-workspace-heading small { display:none; }.ink-workspace-heading .ink-tool { padding-inline:8px;font-size:11px; }.ink-editor .ink-tools { gap:8px; }.ink-tool-group { width:100%;justify-content:space-between; }.ink-tool-group .ink-tool { padding-inline:8px; }.ink-editor .ink-option-controls { gap:10px; }.ink-editor .ink-scroll { padding:8px; }.ink-editor .ink-footer { padding-inline:8px; } }
 @media print { .ink-expanded { position:static; } }
+
+/* Keep the editing controls on the same light surface as the paper. */
+.ink-editor .ink-tools,
+.ink-editor .ink-options {
+  background: #f7f6f1;
+  color: #41423c;
+  border-color: #deddd5;
+  color-scheme: light;
+}
+.ink-editor .ink-tool {
+  background: transparent;
+  color: inherit;
+}
+.ink-editor .ink-tools .ink-tool.is-active,
+.ink-editor .ink-tools .ink-tool:hover:not(:disabled),
+.ink-editor .ink-options .ink-tool:hover:not(:disabled) {
+  background: #e6e5dd;
+  color: #242620;
+}
+.ink-editor .ink-tools .ink-tool { padding: 8px; }
+.ink-history, .ink-paper-actions { display: flex; align-items: center; gap: 2px; }
+.ink-history { padding-left: 8px; border-left: 1px solid #deddd5; }
+.ink-paper-actions { margin-left: auto; }
+.ink-paper-choice select, .ink-option-controls select {
+  min-height: 36px;
+  padding: 4px 7px;
+  border: 1px solid #deddd5;
+  border-radius: 6px;
+  background: #fffefa;
+  color: #363831;
+  font-size: 12px;
+}
+.ink-editor .ink-palette { padding-block: 2px; }
+.ink-editor .ink-colors { min-height: 34px; }
+.ink-editor .ink-color { border-color: #f7f6f1; box-shadow: 0 0 0 1px #bbbcb3; }
+.ink-editor .ink-color.is-active { box-shadow: 0 0 0 2px #42453e; }
+.ink-editor .ink-size { min-height: 36px; }
+.ink-editor .ink-size output, .ink-editor .ink-option-controls label { color: #41423c; }
+.ink-editor .ink-size input, .ink-editor .ink-option-controls input { accent-color: #52564b; }
+.ink-editor .ink-scroll { background: #fff; }
+.ink-paper { box-shadow: none; }
+.ink-editor-inline .ink-footer { color: var(--color-text-secondary); }
+.ink-editor .ink-footer .ink-page-controls span { white-space: nowrap; font-weight: 500; }
+@media (max-width: 680px) {
+  .ink-editor .ink-tool-group { width: auto; gap: 0; }
+  .ink-editor .ink-tools { gap: 5px; }
+  .ink-editor .ink-tools .ink-tool { padding-inline: 7px; }
+  .ink-history { padding-left: 4px; }
+}
+
+.ink-secondary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  background: #f7f6f1;
+  border-bottom: 1px solid #deddd5;
+}
+.ink-editor .ink-secondary > div { border-bottom: 0; }
+.ink-editor .ink-secondary .ink-options { flex: 1 0 auto; min-width: 0; }
+@media (max-width: 680px) {
+  .ink-editor .ink-secondary .ink-options { flex-basis: 100%; }
+}

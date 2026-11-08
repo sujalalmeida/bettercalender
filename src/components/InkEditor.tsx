@@ -1,3 +1,4 @@
+import { createPortal } from "preact/compat";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { liveQuery } from "dexie";
 import type { InkDocument, InkPoint, InkStroke } from "../db/types";
@@ -23,10 +24,12 @@ import { InkRenderer } from "../lib/inkRenderer";
 import { exportInkImage, printInkDocument } from "../lib/inkExport";
 import { createId } from "../lib/id";
 import { registerInkFlusher } from "../lib/inkSaveCoordinator";
+import { PlannerIcon } from "./PlannerIcon";
 import "../styles/ink.css";
 
 interface Props {
   dateISO: string;
+  expandControl?: HTMLElement | null;
 }
 type Tool = "pen" | "pencil" | "highlighter" | "eraser" | "lasso" | "shape";
 const COLORS = [
@@ -41,7 +44,7 @@ const MAX_HISTORY = 60;
 const clamp = (n: number, min: number, max: number) =>
   Math.max(min, Math.min(max, n));
 
-export default function InkEditor({ dateISO }: Props) {
+export default function InkEditor({ dateISO, expandControl }: Props) {
   const [document, setDocument] = useState<InkDocument | null>(null);
   const docRef = useRef<InkDocument | null>(null);
   const [pageIndex, setPageIndex] = useState(0),
@@ -768,6 +771,11 @@ export default function InkEditor({ dateISO }: Props) {
       setStatus("Export failed · try again");
     }
   }
+  const expandButton = (
+    <button class="ink-expand-button" onClick={toggleExpanded} aria-pressed={expanded}>
+      {expanded ? "Done writing" : "Expand canvas"}
+    </button>
+  );
   return (
     <div
       class={`ink-editor ink-editor-inline ${expanded ? "ink-expanded" : ""}`}
@@ -776,36 +784,9 @@ export default function InkEditor({ dateISO }: Props) {
       aria-label={`Handwriting for ${dateISO}`}
       onKeyDown={keyDown}
     >
-      <div class="ink-workspace-heading">
-        <span>
-          Notebook <small>{dateISO}</small>
-        </span>
-        <div>
-          <button
-            class="ink-tool"
-            disabled={!undoRef.current.length}
-            onClick={() => history()}
-            aria-label="Undo stroke"
-          >
-            ↶ Undo
-          </button>
-          <button
-            class="ink-tool"
-            disabled={!redoRef.current.length}
-            onClick={() => history(true)}
-            aria-label="Redo stroke"
-          >
-            ↷ Redo
-          </button>
-          <button
-            class="ink-tool"
-            onClick={toggleExpanded}
-            aria-pressed={expanded}
-          >
-            {expanded ? "Done writing" : "Expand canvas"} {expanded ? "↙" : "↗"}
-          </button>
-        </div>
-      </div>
+      {!expanded && expandControl
+        ? createPortal(expandButton, expandControl)
+        : <div class="ink-workspace-heading"><span>Notebook <small>{dateISO}</small></span>{expandButton}</div>}
       <div class="ink-tools" role="toolbar" aria-label="Drawing tools">
         <div class="ink-tool-group">
           {(
@@ -820,95 +801,27 @@ export default function InkEditor({ dateISO }: Props) {
           ).map((mode) => (
             <button
               class={`ink-tool ${tool === mode ? "is-active" : ""}`}
+              key={mode}
               aria-pressed={tool === mode}
+              aria-label={mode === "highlighter" ? "Marker" : mode === "shape" ? "Shapes" : mode[0].toUpperCase() + mode.slice(1)}
+              title={mode === "highlighter" ? "Marker" : mode === "shape" ? "Shapes" : mode[0].toUpperCase() + mode.slice(1)}
               onClick={() => chooseTool(mode)}
             >
-              {mode === "highlighter"
-                ? "Marker"
-                : mode === "shape"
-                  ? "Shapes"
-                  : mode[0].toUpperCase() + mode.slice(1)}
+              <PlannerIcon name={mode} />
             </button>
           ))}
         </div>
-        <div class="ink-colors" aria-label="Ink color">
-          {COLORS.map((c) => (
-            <button
-              class={`ink-color ${color === c.value ? "is-active" : ""}`}
-              style={{ backgroundColor: c.value }}
-              aria-label={`${c.name} ink`}
-              aria-pressed={color === c.value}
-              onClick={() => {
-                finish();
-                setColor(c.value);
-              }}
-            />
-          ))}
-          <label class="ink-custom-color" title="Custom ink color">
-            <span class="visually-hidden">Custom ink color</span>
-            <input
-              type="color"
-              value={color}
-              onInput={(e) => {
-                finish();
-                setColor(e.currentTarget.value);
-              }}
-            />
-          </label>
+        <div class="ink-history">
+          <button class="ink-tool" disabled={!undoRef.current.length} onClick={() => history()} aria-label="Undo stroke" title="Undo stroke">
+            <PlannerIcon name="undo" />
+          </button>
+          <button class="ink-tool" disabled={!redoRef.current.length} onClick={() => history(true)} aria-label="Redo stroke" title="Redo stroke">
+            <PlannerIcon name="redo" />
+          </button>
         </div>
-        <label class="ink-size">
-          Width
-          <input
-            type="range"
-            min="1"
-            max="18"
-            step=".5"
-            value={size}
-            onInput={(e) => {
-              finish();
-              setSize(Number(e.currentTarget.value));
-            }}
-          />
-          <output>{size}</output>
-        </label>
-      </div>
-      <div class="ink-options">
-        <div class="ink-option-controls">
-          {tool === "eraser" && (
-            <label>
-              Eraser
-              <select
-                aria-label="Eraser mode"
-                value={eraserMode}
-                onChange={(e) => {
-                  finish();
-                  setEraserMode(e.currentTarget.value as typeof eraserMode);
-                }}
-              >
-                <option value="partial">Partial ink</option>
-                <option value="stroke">Whole stroke</option>
-              </select>
-            </label>
-          )}
-          {tool === "shape" && (
-            <label>
-              Shape
-              <select
-                aria-label="Shape"
-                value={shape}
-                onChange={(e) => {
-                  finish();
-                  setShape(e.currentTarget.value as typeof shape);
-                }}
-              >
-                <option value="line">Line</option>
-                <option value="rectangle">Rectangle</option>
-                <option value="ellipse">Ellipse</option>
-              </select>
-            </label>
-          )}
-          <label>
-            Paper
+        <div class="ink-paper-actions">
+          <label class="ink-paper-choice">
+            <span class="visually-hidden">Paper</span>
             <select
               aria-label="Paper"
               value={document?.pages[pageIndex]?.paper ?? "ruled"}
@@ -930,78 +843,165 @@ export default function InkEditor({ dateISO }: Props) {
               <option value="dots">Dots</option>
             </select>
           </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={ruler}
-              onChange={(e) => {
-                finish();
-                setRuler(e.currentTarget.checked);
-              }}
-            />
-            Ruler
-          </label>
-          {ruler && (
-            <label>
-              Angle
-              <input
-                type="range"
-                min="-90"
-                max="90"
-                value={rulerAngle}
-                onInput={(e) => {
+          <button class="ink-tool" disabled={!document} onClick={() => void exportPage()} aria-label="Save PNG" title="Save PNG">
+            <PlannerIcon name="download" />
+          </button>
+          <button class="ink-tool" disabled={!document} onClick={() => void exportPage(true)} aria-label="Print / PDF" title="Print / PDF">
+            <PlannerIcon name="print" />
+          </button>
+        </div>
+      </div>
+      <div class="ink-secondary">
+        <div class="ink-tools ink-palette" role="group" aria-label="Stroke settings">
+          <div class="ink-colors" aria-label="Ink color">
+            {COLORS.map((c) => (
+              <button
+                class={`ink-color ${color === c.value ? "is-active" : ""}`}
+                style={{ backgroundColor: c.value }}
+                aria-label={`${c.name} ink`}
+                aria-pressed={color === c.value}
+                onClick={() => {
                   finish();
-                  setRulerAngle(Number(e.currentTarget.value));
+                  setColor(c.value);
                 }}
               />
-              <output>{rulerAngle}°</output>
+            ))}
+            <label class="ink-custom-color" title="Custom ink color">
+              <span class="visually-hidden">Custom ink color</span>
+              <input
+                type="color"
+                value={color}
+                onInput={(e) => {
+                  finish();
+                  setColor(e.currentTarget.value);
+                }}
+              />
             </label>
-          )}
-          <label>
+          </div>
+          <label class="ink-size">
+            Width
             <input
-              type="checkbox"
-              checked={fingerDraw}
-              onChange={(e) => {
+              type="range"
+              min="1"
+              max="18"
+              step=".5"
+              value={size}
+              onInput={(e) => {
                 finish();
-                setFingerDraw(e.currentTarget.checked);
+                setSize(Number(e.currentTarget.value));
               }}
             />
-            Finger drawing
+            <output>{size}</output>
           </label>
         </div>
-        <div class="ink-zoom">
-          <button
-            class="ink-tool"
-            aria-label="Zoom out"
-            disabled={zoom <= 0.75}
-            onClick={() => {
-              finish();
-              updateZoom(zoom - 0.25);
-            }}
-          >
-            −
-          </button>
-          <button
-            class="ink-tool"
-            aria-label="Fit page width"
-            onClick={() => {
-              finish();
-              updateZoom(1);
-            }}
-          >
-            {Math.round(zoom * 100)}%
-          </button>
-          <button
-            class="ink-tool"
-            aria-label="Zoom in"
-            disabled={zoom >= 3}
-            onClick={() => {
-              finish();
-              updateZoom(zoom + 0.25);
-            }}
-          >
-            +
-          </button>
+        <div class="ink-options">
+          <div class="ink-option-controls">
+            {tool === "eraser" && (
+              <label>
+                Eraser
+                <select
+                  aria-label="Eraser mode"
+                  value={eraserMode}
+                  onChange={(e) => {
+                    finish();
+                    setEraserMode(e.currentTarget.value as typeof eraserMode);
+                  }}
+                >
+                  <option value="partial">Partial ink</option>
+                  <option value="stroke">Whole stroke</option>
+                </select>
+              </label>
+            )}
+            {tool === "shape" && (
+              <label>
+                Shape
+                <select
+                  aria-label="Shape"
+                  value={shape}
+                  onChange={(e) => {
+                    finish();
+                    setShape(e.currentTarget.value as typeof shape);
+                  }}
+                >
+                  <option value="line">Line</option>
+                  <option value="rectangle">Rectangle</option>
+                  <option value="ellipse">Ellipse</option>
+                </select>
+              </label>
+            )}
+            <label>
+              <input
+                type="checkbox"
+                checked={ruler}
+                onChange={(e) => {
+                  finish();
+                  setRuler(e.currentTarget.checked);
+                }}
+              />
+              Ruler
+            </label>
+            {ruler && (
+              <label>
+                Angle
+                <input
+                  type="range"
+                  min="-90"
+                  max="90"
+                  value={rulerAngle}
+                  onInput={(e) => {
+                    finish();
+                    setRulerAngle(Number(e.currentTarget.value));
+                  }}
+                />
+                <output>{rulerAngle}°</output>
+              </label>
+            )}
+            <label>
+              <input
+                type="checkbox"
+                checked={fingerDraw}
+                onChange={(e) => {
+                  finish();
+                  setFingerDraw(e.currentTarget.checked);
+                }}
+              />
+              Finger drawing
+            </label>
+          </div>
+          <div class="ink-zoom">
+            <button
+              class="ink-tool"
+              aria-label="Zoom out"
+              disabled={zoom <= 0.75}
+              onClick={() => {
+                finish();
+                updateZoom(zoom - 0.25);
+              }}
+            >
+              −
+            </button>
+            <button
+              class="ink-tool"
+              aria-label="Fit page width"
+              onClick={() => {
+                finish();
+                updateZoom(1);
+              }}
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              class="ink-tool"
+              aria-label="Zoom in"
+              disabled={zoom >= 3}
+              onClick={() => {
+                finish();
+                updateZoom(zoom + 0.25);
+              }}
+            >
+              +
+            </button>
+          </div>
         </div>
       </div>
       {(selected.length > 0 || hasClipboard) && (
@@ -1094,7 +1094,7 @@ export default function InkEditor({ dateISO }: Props) {
             ‹
           </button>
           <span>
-            {pageIndex + 1} / {document?.pages.length ?? 1}
+            Page {pageIndex + 1} of {document?.pages.length ?? 1}
           </span>
           <button
             class="ink-tool"
@@ -1122,22 +1122,6 @@ export default function InkEditor({ dateISO }: Props) {
         <details class="ink-page-menu">
           <summary>Page actions</summary>
           <div>
-            <button
-              disabled={!document}
-              onClick={() => {
-                void exportPage();
-              }}
-            >
-              Save PNG
-            </button>
-            <button
-              disabled={!document}
-              onClick={() => {
-                void exportPage(true);
-              }}
-            >
-              Print / PDF
-            </button>
             <button
               disabled={!document?.pages[pageIndex]?.strokes.length}
               onClick={() => {
