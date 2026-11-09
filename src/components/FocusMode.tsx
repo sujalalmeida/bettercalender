@@ -15,22 +15,30 @@ import {
 import {
   GARDEN_CLOCK_KEY,
   GARDEN_MILESTONES,
+  OUTPOST_CLOCK_KEY,
+  STUDY_MINUTE,
   gardenElapsed,
   gardenStage,
   legacyGardenCredit,
   newClock,
   parseGardenClock,
   type GardenClock,
+  type FocusWorld,
 } from "../lib/gardenState";
+import { DEFAULT_OUTPOST_GOAL, MAX_OUTPOST_GOAL, OUTPOST_MILESTONES, outpostStage, shouldRaid, validOutpostGoal } from "../lib/outpostState";
 import { useObservable } from "../lib/useObservable";
 import { gardenViewBox } from "../lib/gardenCamera";
 import { GardenLandscape } from "./GardenLandscape";
+import { OutpostLandscape } from "./OutpostLandscape";
 import { UpdateToast } from "./UpdateToast";
 import "../styles/focus.css";
+import "../styles/outpost.css";
 
-function readClock(): GardenClock | null {
+const FOCUS_WORLD_KEY = "plan.focus-world";
+
+function readClock(key: string): GardenClock | null {
   try {
-    return parseGardenClock(localStorage.getItem(GARDEN_CLOCK_KEY));
+    return parseGardenClock(localStorage.getItem(key));
   } catch {
     return null;
   }
@@ -81,8 +89,26 @@ async function waitForCloudGarden(): Promise<void> {
   });
 }
 export function FocusMode() {
+  const [world, setWorld] = useState<FocusWorld>(() => {
+    try {
+      return localStorage.getItem(FOCUS_WORLD_KEY) === "outpost" ? "outpost" : "main";
+    } catch {
+      return "main";
+    }
+  });
+  function selectWorld(next: FocusWorld) {
+    setWorld(next);
+    try { localStorage.setItem(FOCUS_WORLD_KEY, next); } catch { /* The current choice still works. */ }
+  }
+  return <FocusWorkspace key={world} world={world} onSelectWorld={selectWorld} />;
+}
+
+function FocusWorkspace({ world, onSelectWorld }: { world: FocusWorld; onSelectWorld: (world: FocusWorld) => void }) {
+  const isOutpost = world === "outpost";
+  const worldName = isOutpost ? "Twin Suns Outpost" : "Garden";
+  const clockKey = isOutpost ? OUTPOST_CLOCK_KEY : GARDEN_CLOCK_KEY;
   const garden = useObservable(
-    () => liveQuery(() => db.focusGardens.get("main")),
+    () => liveQuery(() => db.focusGardens.get(world)),
     [],
     undefined,
   );
@@ -91,9 +117,18 @@ export function FocusMode() {
     [],
     [],
   );
-  const [clock, setClock] = useState<GardenClock | null>(readClock),
+  const [clock, setClock] = useState<GardenClock | null>(() => readClock(clockKey)),
     clockRef = useRef(clock);
   clockRef.current = clock;
+  const [goal, setGoal] = useState(() => String(
+    validOutpostGoal(clock?.goalMinutes) ? clock.goalMinutes : DEFAULT_OUTPOST_GOAL,
+  ));
+  const [raid, setRaid] = useState(false);
+  useEffect(() => {
+    if (!raid) return;
+    const timer = window.setTimeout(() => setRaid(false), 10000);
+    return () => window.clearTimeout(timer);
+  }, [raid]);
   const [now, setNow] = useState(Date.now()),
     [ready, setReady] = useState(false),
     [error, setError] = useState(""),
@@ -182,10 +217,16 @@ export function FocusMode() {
   const displayed = clock
     ? clock.displayOffsetMs + focusElapsed(clock.timer, now)
     : 0;
-  const running = clock?.timer.startedAt !== null && clock !== null;
+  const running = clock !== null && clock.timer.startedAt !== null;
+  const sessionGoal = validOutpostGoal(clock?.goalMinutes) ? clock.goalMinutes : undefined;
+  const goalElapsed = clock ? focusElapsed(clock.timer, now) : 0;
+  const goalReached = sessionGoal !== undefined && goalElapsed >= sessionGoal * STUDY_MINUTE;
   const stage = gardenStage(total),
     viewMs = preview ?? total,
     viewStage = gardenStage(viewMs);
+  const outpost = outpostStage(total);
+  const nextMilestone = isOutpost ? outpost.next : stage.next;
+  const milestones = isOutpost ? OUTPOST_MILESTONES : GARDEN_MILESTONES;
   const valid = ready && !!garden && clock?.gardenId === garden.generation;
   const plannerUrl = new URL(window.location.href);
   plannerUrl.searchParams.delete("focus");
@@ -194,7 +235,7 @@ export function FocusMode() {
     setClock(next);
     setNow(Date.now());
     try {
-      localStorage.setItem(GARDEN_CLOCK_KEY, JSON.stringify(next));
+      localStorage.setItem(clockKey, JSON.stringify(next));
     } catch {
       setNotice(
         "The timer could not be remembered by this browser. Keep this window open.",
@@ -204,7 +245,7 @@ export function FocusMode() {
   async function boot() {
     setError("");
     try {
-      if (!(await db.focusGardens.get("main"))) await waitForCloudGarden();
+      if (!isOutpost && !(await db.focusGardens.get(world))) await waitForCloudGarden();
       const credit = (() => {
         try {
           return legacyGardenCredit(localStorage);
@@ -212,18 +253,18 @@ export function FocusMode() {
           return 0;
         }
       })();
-      await ensureFocusGarden(credit);
+      await ensureFocusGarden(isOutpost ? 0 : credit, world);
       setReady(true);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Could not load the garden.",
+        err instanceof Error ? err.message : `Could not load ${worldName}.`,
       );
     }
   }
   useEffect(() => {
     void boot();
     const title = document.title;
-    document.title = "Focus Garden · Plan";
+    document.title = isOutpost ? "Twin Suns Outpost · Plan" : "Focus Garden · Plan";
     return () => {
       document.title = title;
     };
@@ -237,7 +278,7 @@ export function FocusMode() {
       if (previous) await saveFocusSession(previous);
       if (cancelled) return;
       const next = newClock(garden.generation);
-      if (previous) {
+      if (previous && !isOutpost) {
         next.displayOffsetMs =
           previous.displayOffsetMs + focusElapsed(previous.timer);
         if (previous.timer.startedAt !== null)
@@ -246,7 +287,7 @@ export function FocusMode() {
       commit(next);
     })().catch(() =>
       setError(
-        "Could not restore the stopwatch. Your saved garden is still here.",
+        "Could not restore the stopwatch. Your saved progress is still here.",
       ),
     );
     return () => {
@@ -260,7 +301,7 @@ export function FocusMode() {
       if (current)
         void saveFocusSession(current).catch(() =>
           setNotice(
-            "Garden progress is waiting to save. Keep this window open and try again.",
+            "Focus progress is waiting to save. Keep this window open and try again.",
           ),
         );
     };
@@ -270,7 +311,7 @@ export function FocusMode() {
       persist();
     };
     const storage = (event: StorageEvent) => {
-      if (event.key !== GARDEN_CLOCK_KEY) return;
+      if (event.key !== clockKey) return;
       const next = parseGardenClock(event.newValue);
       if (next) {
         clockRef.current = next;
@@ -308,8 +349,40 @@ export function FocusMode() {
     };
   }, []);
   async function toggleFocus() {
-    if (!clockRef.current || !valid) return;
+    if (!clockRef.current || !valid || actionBusy) return;
     const current = clockRef.current;
+    setError("");
+    if (isOutpost) {
+      const time = Date.now();
+      if (current.timer.startedAt !== null) {
+        const early = shouldRaid(current, time);
+        const stopped = { ...current, timer: pauseFocus(current.timer, time) };
+        commit(stopped);
+        if (early) launchRaid();
+        else setNotice("Focus goal reached.");
+        try {
+          await saveFocusSession(stopped, time);
+        } catch {
+          setNotice("Session time is kept in this browser. Progress will retry saving.");
+        }
+      } else {
+        const minutes = Number(goal);
+        if (!validOutpostGoal(minutes)) return;
+        setActionBusy(true);
+        try {
+          await saveFocusSession(current);
+          setRaid(false);
+          setNotice("");
+          const next = newClock(current.gardenId);
+          commit({ ...next, goalMinutes: minutes, timer: startFocus(next.timer) });
+        } catch {
+          setError("Could not save the previous session. Try starting again.");
+        } finally {
+          setActionBusy(false);
+        }
+      }
+      return;
+    }
     const next = {
       ...current,
       timer:
@@ -327,13 +400,30 @@ export function FocusMode() {
       );
     }
   }
+  function launchRaid() {
+    setPreview(null);
+    moveCamera(0.5);
+    setRaid(true);
+    setNotice("");
+  }
   async function resetStopwatch() {
-    if (!clockRef.current || !garden) return;
+    if (!clockRef.current || !garden || actionBusy) return;
     setActionBusy(true);
+    setError("");
     try {
-      await saveFocusSession(clockRef.current);
-      commit(newClock(garden.generation));
-      setNotice("Stopwatch reset.");
+      const current = clockRef.current;
+      const time = Date.now();
+      const early = isOutpost && shouldRaid(current, time);
+      const stopped = isOutpost && current.timer.startedAt !== null
+        ? { ...current, timer: pauseFocus(current.timer, time) }
+        : current;
+      if (stopped !== current) commit(stopped);
+      if (early) launchRaid();
+      await saveFocusSession(stopped, time);
+      const next = newClock(garden.generation);
+      const minutes = Number(goal);
+      commit(isOutpost && validOutpostGoal(minutes) ? { ...next, goalMinutes: minutes } : next);
+      if (!early) setNotice("Stopwatch reset.");
     } catch {
       setError(
         "Could not save this session. Try again before resetting the stopwatch.",
@@ -384,35 +474,31 @@ export function FocusMode() {
       }
     }
   }
+  const sceneMs = Math.floor(viewMs / 5000) * 5000;
   const landscape = useMemo(
-    () => (
+    () => isOutpost ? (
+      <OutpostLandscape elapsedMs={sceneMs} seed={garden?.seed ?? 1} motion={motion} raid={raid} />
+    ) : (
       <GardenLandscape
-        elapsedMs={Math.floor(viewMs / 5000) * 5000}
+        elapsedMs={sceneMs}
         seed={garden?.seed ?? 1}
         motion={motion}
       />
     ),
-    [Math.floor(viewMs / 5000), garden?.seed, motion],
+    [isOutpost, sceneMs, garden?.seed, motion, raid],
   );
   return (
     <div
-      class={`focus-shell ${preview !== null ? "focus-is-preview" : ""} ${immersive ? "focus-immersive" : ""} ${hiddenControls ? "focus-controls-hidden" : ""}`}
+      class={`focus-shell ${isOutpost ? "focus-outpost" : ""} ${preview !== null ? "focus-is-preview" : ""} ${immersive ? "focus-immersive" : ""} ${hiddenControls ? "focus-controls-hidden" : ""}`}
       ref={root}
     >
       <header class="focus-header">
         <a class="focus-return" href={plannerUrl.toString()}>
           ← Plan
         </a>
-        <div class="focus-brand">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M12 21V9M12 15C1 16 2 3 11 10M12 12C23 13 23 0 13 7"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-            />
-          </svg>
-          Focus garden
+        <div class="focus-world-picker" role="group" aria-label="Focus world">
+          <button type="button" aria-pressed={!isOutpost} disabled={running || actionBusy} onClick={() => onSelectWorld("main")}>Garden</button>
+          <button type="button" aria-pressed={isOutpost} disabled={running || actionBusy} onClick={() => onSelectWorld("outpost")}>Twin Suns Outpost</button>
         </div>
         <button
           class="focus-text-action"
@@ -425,16 +511,16 @@ export function FocusMode() {
       </header>
       <main class="focus-layout">
         <div class="focus-landscape-heading">
-          <h1>Garden</h1>
+          <h1>{worldName}</h1>
           <div class="focus-season">
-            <span>{viewStage.season}</span>
+            <span>{isOutpost ? "Outer Rim" : viewStage.season}</span>
             <i />
             {viewStage.phase}
           </div>
         </div>
         <section
           class="focus-garden-panel"
-          aria-label="Persistent study garden"
+          aria-label={isOutpost ? "Persistent Twin Suns Outpost" : "Persistent study garden"}
         >
           <div
             class="focus-garden-scene"
@@ -449,14 +535,14 @@ export function FocusMode() {
               <div class="focus-scene-badges">
                 <span>Preview</span>
                 <button onClick={() => setPreview(null)}>
-                  Return to garden
+                  {isOutpost ? "Return to outpost" : "Return to garden"}
                 </button>
               </div>
             )}
             <div class="focus-camera-controls">
               <button
                 disabled={fitGarden}
-                aria-label="View left side of garden"
+                aria-label={isOutpost ? "View left side of outpost" : "View left side of garden"}
                 onClick={() => moveCamera(camera.current - 0.3)}
               >
                 ←
@@ -466,11 +552,11 @@ export function FocusMode() {
                 onClick={toggleFitGarden}
                 aria-pressed={fitGarden}
               >
-                {fitGarden ? "Fill view" : "Fit garden"}
+                {fitGarden ? "Fill view" : isOutpost ? "Fit outpost" : "Fit garden"}
               </button>
               <button
                 disabled={fitGarden}
-                aria-label="View right side of garden"
+                aria-label={isOutpost ? "View right side of outpost" : "View right side of garden"}
                 onClick={() => moveCamera(camera.current + 0.3)}
               >
                 →
@@ -481,11 +567,6 @@ export function FocusMode() {
                 class="focus-show-controls"
                 hidden={!immersive}
                 onClick={() => setHiddenControls(!hiddenControls)}
-                aria-label={
-                  hiddenControls
-                    ? "Show garden controls"
-                    : "Hide garden controls"
-                }
               >
                 {hiddenControls ? "Show controls" : "Hide controls"}
               </button>
@@ -514,21 +595,21 @@ export function FocusMode() {
               {formatFocusTime(displayed)}
             </div>
             <span class="focus-timer-state">
-              {running ? "Running" : displayed ? "Paused" : "Ready"}
+              {running ? "Running" : displayed ? isOutpost ? "Session ended" : "Paused" : "Ready"}
             </span>
           </div>
           <div class="focus-clock-actions">
             <button
               class="focus-main-action"
-              disabled={!valid || actionBusy}
+              disabled={!valid || actionBusy || (isOutpost && !running && !validOutpostGoal(Number(goal)))}
               onClick={() => {
                 void toggleFocus();
               }}
             >
               {running
-                ? "Pause focus"
+                ? isOutpost ? "End session" : "Pause focus"
                 : displayed
-                  ? "Continue focusing"
+                  ? isOutpost ? "Start new session" : "Continue focusing"
                   : "Start focusing"}{" "}
               <span aria-hidden="true">{running ? "Ⅱ" : "→"}</span>
             </button>
@@ -549,13 +630,26 @@ export function FocusMode() {
                 <small>h</small> {Math.floor(total / 60000) % 60}
                 <small>m</small>
               </strong>
-              <span>Garden time</span>
+              <span>{isOutpost ? "Outpost time" : "Garden time"}</span>
             </div>
             <div>
-              <strong>{stage.flowers.toLocaleString()}</strong>
-              <span>Flowers</span>
+              <strong>{isOutpost ? outpost.completed : stage.flowers.toLocaleString()}</strong>
+              <span>{isOutpost ? "Milestones" : "Flowers"}</span>
             </div>
           </div>
+          {isOutpost && <div class="focus-goal">
+            <label>
+              Goal time
+              <input type="number" min="1" max={MAX_OUTPOST_GOAL} step="1" inputMode="numeric" value={running ? sessionGoal ?? goal : goal} disabled={running || actionBusy} onInput={event => setGoal(event.currentTarget.value)} />
+              <span>min</span>
+            </label>
+            <div class="focus-goal-status">
+              {running && sessionGoal !== undefined ? <>
+                <progress aria-label="Focus goal progress" max={sessionGoal * STUDY_MINUTE} value={Math.min(goalElapsed, sessionGoal * STUDY_MINUTE)} />
+                <span>{goalReached ? "Goal reached" : `${formatFocusTime(sessionGoal * STUDY_MINUTE - goalElapsed)} to goal`}</span>
+              </> : <span>Ending a session early triggers a Sith raid.</span>}
+            </div>
+          </div>}
         </section>
         {error && (
           <div class="focus-notice has-error" role="alert">
@@ -571,18 +665,18 @@ export function FocusMode() {
             )}
           </div>
         )}
-        {notice && (
+        {(notice || raid) && (
           <p class="focus-notice" role="status">
-            {notice}
+            {notice || "Sith raid. The outpost will recover."}
           </p>
         )}
         <footer class="focus-garden-footer">
           <div class="focus-next">
-            <span class="focus-eyebrow">{stage.next ? "Next" : "Garden"}</span>
+            <span class="focus-eyebrow">{nextMilestone ? "Next" : worldName}</span>
             <span>
-              {stage.next
-                ? `${stage.next.label} · ${Math.ceil(stage.next.minutes - stage.minutes)} min to go`
-                : "Planting continues"}
+              {nextMilestone
+                ? `${nextMilestone.label} · ${Math.ceil(nextMilestone.minutes - stage.minutes)} min to go`
+                : isOutpost ? "The spaceport is fully built" : "Planting continues"}
             </span>
           </div>
           <div class="focus-footer-actions">
@@ -620,7 +714,7 @@ export function FocusMode() {
                       onClick={() => setPreview(minute * 60000)}
                     >
                       {minute === 660
-                        ? "Night garden"
+                        ? isOutpost ? "Night outpost" : "Night garden"
                         : minute === 0
                           ? "New"
                           : minute < 60
@@ -630,8 +724,8 @@ export function FocusMode() {
                   ))}
                 </div>
                 <ul>
-                  {GARDEN_MILESTONES.map((m) => (
-                    <li class={stage.minutes >= m.minutes ? "is-earned" : ""}>
+                  {milestones.map((m) => (
+                    <li key={m.minutes} class={stage.minutes >= m.minutes ? "is-earned" : ""}>
                       <span>
                         {m.minutes < 60
                           ? `${m.minutes}m`
@@ -643,12 +737,12 @@ export function FocusMode() {
                 </ul>
               </div>
             </details>
-            <button
+            {!isOutpost && <button
               onClick={() => setRestartConfirm(true)}
               disabled={!valid || actionBusy}
             >
               Restart the Garden
-            </button>
+            </button>}
           </div>
         </footer>
         {restartConfirm && (
