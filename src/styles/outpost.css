@@ -1,0 +1,185 @@
+.focus-world-picker {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--focus-border);
+  border-radius: 10px;
+}
+
+.focus-world-picker button {
+  min-height: 40px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: inherit;
+}
+
+.focus-world-picker button[aria-pressed="true"] {
+  background: #d3dec0;
+  color: #273c2d;
+}
+
+.focus-world-picker button:disabled:not([aria-pressed="true"]) {
+  opacity: .5;
+  cursor: default;
+}
+
+.focus-outpost {
+  background: #211e29;
+  color: #f2e3d2;
+  --focus-border: #51434c;
+}
+
+.focus-outpost .focus-header,
+.focus-outpost .focus-garden-panel,
+.focus-outpost .focus-control-panel {
+  border-color: var(--focus-border);
+}
+
+.focus-outpost .focus-return,
+.focus-outpost .focus-text-action,
+.focus-outpost .focus-eyebrow,
+.focus-outpost .focus-season,
+.focus-outpost .focus-timer-state,
+.focus-outpost .focus-garden-stats strong,
+.focus-outpost .focus-garden-stats span,
+.focus-outpost .focus-garden-stats small,
+.focus-outpost .focus-next > span,
+.focus-outpost .focus-footer-actions > button,
+.focus-outpost .focus-roadmap summary {
+  color: #dbc4b5;
+}
+
+.focus-outpost .focus-world-picker button[aria-pressed="true"],
+.focus-outpost .focus-main-action {
+  background: #ebc3a0;
+  color: #302433;
+}
+
+.focus-outpost .focus-reset {
+  color: #ebcbb1;
+  border-color: #6a5159;
+}
+
+.focus-outpost .focus-main-action:hover:not(:disabled) { background: #f4d5b8; }
+.focus-outpost .focus-garden-scene { background: #2d2539; }
+.focus-outpost .focus-roadmap > div { background: #342735; border-color: #6a5159; }
+.focus-outpost .focus-roadmap button { border-color: #745a62; }
+.focus-outpost .focus-roadmap button[aria-pressed="true"] { background: #ebc3a0; color: #302433; }
+.focus-outpost .focus-roadmap p,
+.focus-outpost .focus-roadmap li { color: #c5aba4; }
+.focus-outpost .focus-roadmap li.is-earned { color: #f3d4b4; }
+
+.focus-outpost .focus-camera-controls,
+.focus-outpost .focus-scene-controls button,
+.focus-outpost .focus-scene-badges > span,
+.focus-outpost .focus-scene-badges button {
+  background: #302434d9;
+  color: #f2e3d2;
+  border-color: #e5b79563;
+}
+
+.focus-outpost.focus-immersive .focus-control-panel {
+  background: #2a2230ed;
+}
+
+.focus-outpost .focus-notice {
+  background: #322732;
+  border-color: #6b5159;
+  color: #f2d0b6;
+}
+
+.focus-goal {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--focus-border);
+  color: #d4b9ae;
+  font-size: 12px;
+}
+
+.focus-goal label, .focus-goal-status { display: flex; align-items: center; gap: 8px; }
+.focus-goal label { color: #f0d8c4; font-weight: 650; }
+.focus-goal input {
+  width: 68px;
+  min-height: 36px;
+  padding: 5px 6px;
+  border: 1px solid #755a64;
+  border-radius: 6px;
+  background: #2f2633;
+  color: #fff0de;
+}
+.focus-goal input:disabled { opacity: .75; }
+.focus-goal progress { width: 100px; height: 6px; accent-color: #efb88b; }
+
+@media (max-width: 600px) {
+  .focus-world-picker button { min-height: 34px; padding: 5px 7px; font-size: 11px; }
+  .focus-goal { gap: 8px; padding-top: 8px; }
+  .focus-goal-status { flex-wrap: wrap; }
+  .focus-outpost.focus-immersive:not(.focus-controls-hidden) .focus-camera-controls {
+    bottom: max(230px, calc(212px + env(safe-area-inset-bottom)));
+  }
+}
+
+@media (min-width: 601px) {
+  .focus-outpost.focus-immersive:not(.focus-controls-hidden) .focus-camera-controls { bottom: 185px; }
+}
+
+.outpost-beacon { animation: outpost-beacon 3.5s ease-in-out infinite; }
+.outpost-capital-drift { animation: outpost-drift 28s ease-in-out infinite alternate; }
+.outpost-droid-roll { animation: outpost-roll 11s ease-in-out infinite alternate; }
+.outpost-speeder { animation: outpost-speeder 16s ease-in-out infinite alternate; }
+.outpost-fighter-flight { animation: outpost-flight 18s ease-in-out infinite alternate; }
+.outpost-raid-sith { animation: outpost-sith 10s ease-in-out both; }
+.outpost-raid-defense { animation: outpost-defense 10s ease-out both; }
+.outpost-raid-glow { animation: outpost-impact 10s ease-out both; }
+.outpost-raid-debris { animation: outpost-impact 10s ease-out both; }
+.outpost-raid-smoke { animation: outpost-smoke 10s ease-out both; }
+.outpost-saber-sweep { animation: outpost-impact 10s ease-out both; }
+.outpost-under-raid .outpost-structure {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: outpost-damage 10s ease-in-out both;
+}
+
+@keyframes outpost-beacon { 50% { opacity: .4; } }
+@keyframes outpost-drift { to { transform: translate(23px, 3px); } }
+@keyframes outpost-roll { to { transform: translate(48px, 0); } }
+@keyframes outpost-speeder { to { transform: translate(320px, -42px); } }
+@keyframes outpost-flight { to { transform: translate(245px, -130px); } }
+@keyframes outpost-sith {
+  0% { transform: translate(380px, -18px); opacity: 0; }
+  23%, 72% { transform: translate(0, 0); opacity: 1; }
+  100% { transform: translate(320px, -10px); opacity: 0; }
+}
+@keyframes outpost-defense {
+  0%, 20% { opacity: 0; transform: translate(-52px, 0); }
+  45%, 88% { opacity: 1; transform: translate(0, 0); }
+  100% { opacity: 0; }
+}
+@keyframes outpost-impact {
+  0%, 24% { opacity: 0; }
+  36% { opacity: .85; }
+  77% { opacity: .36; }
+  100% { opacity: 0; }
+}
+@keyframes outpost-smoke {
+  0%, 25% { opacity: 0; transform: translateY(13px); }
+  55% { opacity: .66; }
+  100% { opacity: 0; transform: translateY(-35px); }
+}
+@keyframes outpost-damage {
+  0%, 28%, 100% { opacity: 1; transform: scaleY(1); }
+  44%, 70% { opacity: .45; transform: scaleY(.32); }
+}
+
+.garden-still.outpost-under-raid .outpost-structure { opacity: .5; }
+
+.garden-still .outpost-raid,
+.garden-still .outpost-raid * { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .outpost-landscape * { animation: none !important; }
+}
